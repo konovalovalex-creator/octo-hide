@@ -87,7 +87,7 @@ namespace OctoHide
                 papillae = 0.2f,
                 average = avg,
                 captureLocalToWorld = capturePose,
-                sourceSurfaceId = r.GetInstanceID()
+                sourceSurfaceId = -1 - (r.GetHashCode() & 0x7FFFFFFE) // отрицательные ID — поверхности без CamoSurface
             };
             return true;
         }
