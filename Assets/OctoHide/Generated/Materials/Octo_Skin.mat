@@ -39,6 +39,8 @@ Material:
     - _PapillaeHeight: 0.035
     - _RampSmooth: 0.08
     - _RampThreshold: 0.25
+    - _RippleStrength: 0
+    - _RippleTime: 100
     - _ScaleA: 2
     - _ScaleB: 2
     - _ShadowStrength: 0.45
@@ -48,6 +50,7 @@ Material:
     - _AvgA: {r: 0.7, g: 0.26999995, b: 0.22999996, a: 1}
     - _AvgB: {r: 0.7, g: 0.26999995, b: 0.22999996, a: 1}
     - _EdgeColor: {r: 0.14999998, g: 0.049999982, b: 0.049999982, a: 1}
+    - _RippleCenter: {r: 0, g: 0, b: 0, a: 0}
     - _TintA: {r: 0.9, g: 0.34999996, b: 0.29999998, a: 1}
     - _TintB: {r: 0.9, g: 0.34999996, b: 0.29999998, a: 1}
   m_BuildTextureStacks: []
