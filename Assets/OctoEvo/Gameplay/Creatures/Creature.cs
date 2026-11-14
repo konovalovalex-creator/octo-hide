@@ -31,7 +31,7 @@ namespace OctoEvo
         Transform[] legs;
         float[] legYaw;
         Transform[] claws;
-        MaterialPropertyBlock mpb;
+        Material mat; // экземпляр материала этой особи
         Color back, belly, pattern;
         float swimPhase;
         float stateUntil;
@@ -130,7 +130,7 @@ namespace OctoEvo
                 mr.sharedMaterial = def.modelMaterial;
                 list.Add(mr);
                 renderers = list.ToArray();
-                mpb = new MaterialPropertyBlock();
+                MakeMaterial(def.modelMaterial);
                 return;
             }
 
@@ -184,58 +184,67 @@ namespace OctoEvo
                 }
             }
             renderers = list.ToArray();
-            mpb = new MaterialPropertyBlock();
+            MakeMaterial(material);
+        }
+
+        /// <summary>
+        /// У каждой особи свой экземпляр материала (а не MaterialPropertyBlock): так объект остаётся
+        /// в SRP Batcher и получает от URP данные о главном источнике света. С блоком свойств существа были чёрными.
+        /// </summary>
+        void MakeMaterial(Material source)
+        {
+            if (mat != null) Destroy(mat);
+            mat = new Material(source) { name = source.name + " (creature)" };
+            foreach (var r in renderers) r.sharedMaterial = mat;
+        }
+
+        void OnDestroy()
+        {
+            if (mat != null) Destroy(mat);
         }
 
         void ApplyProperties(float swimAmp)
         {
-            if (mpb == null) return;
+            if (mat == null) return;
             var def = Def;
-            mpb.SetColor(IdBase, back);
-            mpb.SetColor(IdBelly, belly);
-            mpb.SetColor(IdPattern, pattern);
-            mpb.SetFloat(IdPatternType, def.pattern);
-            mpb.SetFloat(IdPatternScale, def.patternScale);
-            mpb.SetFloat(IdSmooth, def.smoothness);
-            mpb.SetFloat(IdTrans, def.translucency);
-            mpb.SetFloat(IdPhase, swimPhase);
+            mat.SetColor(IdBase, back);
+            mat.SetColor(IdBelly, belly);
+            mat.SetColor(IdPattern, pattern);
+            mat.SetFloat(IdPatternType, def.pattern);
+            mat.SetFloat(IdPatternScale, def.patternScale);
+            mat.SetFloat(IdSmooth, def.smoothness);
+            mat.SetFloat(IdTrans, def.translucency);
+            mat.SetFloat(IdPhase, swimPhase);
             if (textured)
             {
-                mpb.SetColor(IdTint, tint);
-                mpb.SetFloat(IdAmp, swimAmp * def.swimWave / 0.05f);
-                foreach (var r in renderers) r.SetPropertyBlock(mpb);
+                mat.SetColor(IdTint, tint);
+                mat.SetFloat(IdAmp, swimAmp * def.swimWave / 0.05f);
                 return;
             }
             if (def.body == CreatureBody.Crab)
             {
-                mpb.SetFloat(IdHalfHeight, 0.08f);
-                mpb.SetVector(IdEyePos, new Vector4(0.045f, 0.075f, 0.16f, 0f));
-                mpb.SetFloat(IdEyeRadius, 0.018f);
-                mpb.SetFloat(IdAmp, 0f);
+                mat.SetFloat(IdHalfHeight, 0.08f);
+                mat.SetVector(IdEyePos, new Vector4(0.045f, 0.075f, 0.16f, 0f));
+                mat.SetFloat(IdEyeRadius, 0.018f);
+                mat.SetFloat(IdAmp, 0f);
             }
             else
             {
-                mpb.SetFloat(IdHalfHeight, def.halfHeight);
+                mat.SetFloat(IdHalfHeight, def.halfHeight);
                 float eyeZ = def.body == CreatureBody.Shrimp ? 0.36f : 0.37f;
                 if (def.body == CreatureBody.Flatfish)
                 {
                     // оба глаза сверху
-                    mpb.SetVector(IdEyePos, new Vector4(def.halfWidth * 0.22f, def.halfHeight * 0.75f, 0.33f, 0f));
-                    mpb.SetFloat(IdEyeRadius, 0.022f);
-                    mpb.SetFloat(IdAmp, 0f);
+                    mat.SetVector(IdEyePos, new Vector4(def.halfWidth * 0.22f, def.halfHeight * 0.75f, 0.33f, 0f));
+                    mat.SetFloat(IdEyeRadius, 0.022f);
+                    mat.SetFloat(IdAmp, 0f);
                 }
                 else
                 {
-                    mpb.SetVector(IdEyePos, new Vector4(def.halfWidth * 0.75f, def.halfHeight * 0.25f, eyeZ, 0f));
-                    mpb.SetFloat(IdEyeRadius, def.halfHeight * 0.22f);
-                    mpb.SetFloat(IdAmp, swimAmp);
+                    mat.SetVector(IdEyePos, new Vector4(def.halfWidth * 0.75f, def.halfHeight * 0.25f, eyeZ, 0f));
+                    mat.SetFloat(IdEyeRadius, def.halfHeight * 0.22f);
+                    mat.SetFloat(IdAmp, swimAmp);
                 }
-            }
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                // Ноги и клешни — без волны
-                if (i > 0) mpb.SetFloat(IdAmp, 0f);
-                renderers[i].SetPropertyBlock(mpb);
             }
         }
 
