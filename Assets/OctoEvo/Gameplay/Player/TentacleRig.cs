@@ -54,6 +54,77 @@ namespace OctoEvo
             public bool planted;
             public float phase;
             public Transform reachTarget;  // щупальце тянется к объекту (захват добычи)
+            public float crawlBlend;       // 0..1 — плавный вход в цикл ползания
+            public int lastCycle;
+        }
+
+        float cyclePhase;
+
+        /// <summary>
+        /// Цикл ползания по дну (как у настоящего осьминога): руки не «шагают», а по очереди
+        /// вытягиваются и сокращаются. Передние тянутся вперёд, цепляются и, сокращаясь, подтягивают тело;
+        /// задние, вытягиваясь, толкают. По руке бежит мягкая волна, кончик закручен — тем сильнее,
+        /// чем рука короче. Фаза цикла привязана к пройденному пути, поэтому руки не «скользят».
+        /// </summary>
+        void CrawlArm(Tentacle tc, int t, Vector3 rootPos, Vector3 outDir, Vector3 up, PoseCfg cfg, float dt, Vector3 velDir, float move)
+        {
+            int n = segments;
+            float L = length * S;
+            float ph = cyclePhase + tc.phase + t * 0.137f;
+            float c = Mathf.Cos(ph * 2f * Mathf.PI), sn = Mathf.Sin(ph * 2f * Mathf.PI);
+            float along = Mathf.Clamp(Vector3.Dot(outDir, velDir) * 2f, -1f, 1f);
+            float lively = Mathf.Clamp(cfg.wiggle / (0.03f * S), 0.15f, 1.5f);
+
+            float nominal = Mathf.Clamp(cfg.reach / L, 0.2f, 1f);
+            float ext = Mathf.Clamp(nominal * (1f + 0.24f * move * c * along + 0.04f * sn * lively), 0.2f, 1.05f);
+
+            // мах: вперёд по ходу → назад; на возврате рука чуть приподнята
+            Vector3 d0 = (outDir + velDir * (0.45f * c - 0.15f) * move).normalized;
+            Vector3 sideV = Vector3.Cross(up, d0);
+            float lift = Mathf.Max(0f, -sn) * 0.05f * S * move;
+
+            float step = L * ext / (n - 1);
+            float curlSign = (t % 2 == 0) ? 1f : -1f;
+            float curl = (1.2f + 2.4f * (1f - ext / 1.05f)) * Mathf.Lerp(0.2f, 1f, Mathf.Clamp01(lively));
+            float wave = 0.32f * lively;
+
+            tc.crawlBlend = Mathf.MoveTowards(tc.crawlBlend, 1f, dt / 0.3f);
+            float k = Mathf.Max(tc.crawlBlend * tc.crawlBlend, 1f - Mathf.Exp(-10f * dt));
+
+            Vector3 p = rootPos;
+            float g = 0f;
+            tc.pos[0] = tc.prev[0] = rootPos;
+            for (int i = 1; i < n; i++)
+            {
+                float u = i / (float)(n - 1);
+                float cu = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.5f, 1f, u));
+                float ang = wave * u * Mathf.Sin(2f * Mathf.PI * (u * 1.1f - ph)) + curlSign * curl * cu * cu;
+                p += (d0 * Mathf.Cos(ang) + sideV * Mathf.Sin(ang)) * step;
+
+                if (i % 3 == 0 || i == n - 1 || i == 1)
+                {
+                    if (Physics.Raycast(p + up * 0.5f * S, -up, out RaycastHit hit, 1.4f * S, surfaceMask, QueryTriggerInteraction.Ignore)
+                        && hit.collider.attachedRigidbody == null)
+                        g = Vector3.Dot(hit.point - p, up);
+                }
+                float rad = Mathf.Lerp(rootRadius, tipRadius, Mathf.Pow(u, 0.8f)) * S * 0.5f;
+                float blend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(u / 0.3f));
+                Vector3 target = p + up * Mathf.Lerp(0f, g + rad + lift * u, blend);
+                tc.pos[i] = Vector3.LerpUnclamped(tc.pos[i], target, k);
+                tc.prev[i] = tc.pos[i];
+            }
+            tc.foot = tc.footFrom = tc.footTo = tc.pos[n - 1];
+            tc.planted = true;
+            tc.stepT = 1f;
+
+            // «шлепок» присосок раз в цикл, пока ползём
+            int cyc = Mathf.FloorToInt(ph);
+            if (cyc != tc.lastCycle)
+            {
+                tc.lastCycle = cyc;
+                if (move > 0.15f && controller.isLocalPlayer)
+                    AudioDirector.Play(Sfx.Crawl, tc.foot, 0.3f, 1.3f - Mathf.Clamp01(S) * 0.4f);
+            }
         }
 
         Tentacle[] tentacles;
@@ -249,6 +320,12 @@ namespace OctoEvo
             float lift = liftNow * S;
             float L = length * S;
 
+            // Цикл ползания: фаза идёт от пройденного пути (+ медленно сама по себе, чтобы руки «дышали» на месте)
+            Vector3 planarVel = Vector3.ProjectOnPlane(controller.Velocity, up);
+            float crawlMove = grounded ? Mathf.Clamp01(controller.NormalizedSpeed) : 0f;
+            Vector3 crawlDir = planarVel.sqrMagnitude > 1e-8f ? planarVel.normalized : Vector3.zero;
+            cyclePhase += planarVel.magnitude * dt / Mathf.Max(1e-4f, 0.7f * L) + dt * 0.06f;
+
             // Сколько щупалец сейчас в шаге — шагаем «волнами», не всеми сразу
             int stepping = 0;
             foreach (var tc in tentacles) if (tc.stepT < 1f) stepping++;
@@ -259,6 +336,13 @@ namespace OctoEvo
                 Vector3 rootPos = RootWorld(root, t);
                 Vector3 outDir = OutWorld(root, t);
                 Vector3 side = Vector3.Cross(up, outDir);
+
+                if (grounded && cfg.mode == TentacleMode.Plant && tc.reachTarget == null)
+                {
+                    CrawlArm(tc, t, rootPos, outDir, up, cfg, dt, crawlDir, crawlMove);
+                    continue;
+                }
+                tc.crawlBlend = 0f;
 
                 // ---- Желаемое положение кончика
                 bool wantsPlant = grounded && (cfg.mode == TentacleMode.Plant || cfg.mode == TentacleMode.Trail);

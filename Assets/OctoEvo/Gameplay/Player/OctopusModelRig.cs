@@ -51,6 +51,8 @@ namespace OctoEvo
         Vector3[] outP, outN;
         Vector4[] outT;
         Vector3[][] frT, frN, frB;
+        float[] thick;     // утолщение руки: сократилась — стала толще (объём сохраняется)
+        float flat;        // на дне руки распластываются вширь
 
         void Awake()
         {
@@ -256,6 +258,8 @@ namespace OctoEvo
             GetComponent<MeshFilter>().sharedMesh = mesh;
             outP = new Vector3[nV]; outN = new Vector3[nV]; outT = new Vector4[nV];
             frT = new Vector3[Arms][]; frN = new Vector3[Arms][]; frB = new Vector3[Arms][];
+            thick = new float[Arms];
+            for (int k = 0; k < Arms; k++) thick[k] = 1f;
             for (int k = 0; k < Arms; k++) { frT[k] = new Vector3[segs]; frN[k] = new Vector3[segs]; frB[k] = new Vector3[segs]; }
 
             Report = $"тело {nV - armVerts} вершин, щупальца {armVerts}, масштаб {scale:0.00}";
@@ -276,7 +280,13 @@ namespace OctoEvo
                 var C = rig.Chain(k);
                 if (C == null) return;
                 Frames(C, up, frT[k], frN[k], frB[k]);
+                float len = 0f;
+                for (int j = 1; j < C.Length; j++) len += Vector3.Distance(C[j - 1], C[j]);
+                float ratio = len / Mathf.Max(1e-5f, armLength * S);
+                float want = Mathf.Clamp(1f / Mathf.Sqrt(Mathf.Max(0.2f, ratio)), 0.85f, 1.6f);
+                thick[k] = Mathf.Lerp(thick[k], want, 1f - Mathf.Exp(-8f * Time.deltaTime));
             }
+            flat = Mathf.MoveTowards(flat, motor.IsGrounded ? 1f : 0f, Time.deltaTime * 3f);
 
             // Жёсткая часть повторяет тело: поза покоя → текущая поза тела (сдвиг, поворот, «дыхание»)
             Matrix4x4 bodyM = body.parent.localToWorldMatrix
@@ -295,7 +305,11 @@ namespace OctoEvo
                 {
                     Sample(rig.Chain(k), frT[k], frN[k], frB[k], tParam[i], out Vector3 P, out Vector3 T, out Vector3 N, out Vector3 B);
                     Vector3 o = offP[i];
-                    Vector3 ap = P + (T * o.x + N * o.y + B * o.z) * S;
+                    // толщина по состоянию руки + распластывание у основания, когда лежит на дне
+                    float baseU = 1f - Mathf.Clamp01(tParam[i] / (segs - 1));
+                    float wide = thick[k] * (1f + 0.3f * flat * baseU * baseU);
+                    float tall = thick[k] * (1f - 0.12f * flat * baseU);
+                    Vector3 ap = P + (T * o.x + N * (o.y * tall) + B * (o.z * wide)) * S;
                     Vector3 on = offN[i]; Vector3 an = T * on.x + N * on.y + B * on.z;
                     Vector3 ot = offT[i]; Vector3 at = T * ot.x + N * ot.y + B * ot.z;
                     float w = weight[i];
