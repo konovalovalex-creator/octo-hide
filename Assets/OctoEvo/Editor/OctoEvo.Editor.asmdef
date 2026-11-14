@@ -1,0 +1,22 @@
+{
+    "rootNamespace": "OctoEvo",
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "name": "OctoEvo.Editor",
+    "references": [
+        "OctoEvo.Core",
+        "OctoEvo.Gameplay",
+        "OctoEvo.UI",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime"
+    ]
+}
