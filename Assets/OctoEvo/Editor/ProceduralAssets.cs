@@ -110,7 +110,7 @@ namespace OctoEvo.EditorTools
                 float warp = Fbm(u, v, 3, 3) * 0.9f;
                 float ripple = Mathf.Sin((v * 9f + warp) * Mathf.PI * 2f) * 0.5f + 0.5f;
                 ripple = Mathf.Pow(ripple, 1.6f);
-                return ripple * 0.55f + Fbm(u, v, 16, 3) * 0.3f + Fbm(u, v, 64, 2) * 0.15f;
+                return ripple * 0.4f + Fbm(u, v, 16, 3) * 0.4f + Fbm(u, v, 64, 2) * 0.2f;
             },
             (u, v, h, x, y) =>
             {
@@ -121,7 +121,7 @@ namespace OctoEvo.EditorTools
                 else if (g < 0.01f) baseC = Color.Lerp(baseC, new Color(0.96f, 0.93f, 0.86f), 0.8f);  // обломки ракушек
                 baseC.a = 1f;
                 return baseC;
-            }, 2.2f);
+            }, 1.2f);
 
         public static TexSet Rock() => MakeSet("Rock", 512,
             (u, v) => Ridged(u, v, 4, 5) * 0.75f + Fbm(u, v, 24, 3) * 0.25f,

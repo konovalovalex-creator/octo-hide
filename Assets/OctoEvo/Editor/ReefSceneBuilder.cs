@@ -50,7 +50,7 @@ namespace OctoEvo.EditorTools
                 for (int i = 0; i < coralHeads.Length; i++) coralHeads[i] = ProceduralAssets.Rock("CoralHead_" + i, 20 + i, 0.6f);
 
                 EditorUtility.DisplayProgressBar("OctoEvo", "Материалы…", 0.55f);
-                var mSand = EnvMat("Sand", env, sand.albedo, sand.normal, Color.white, 0.32f, 0.12f, 1f);
+                var mSand = EnvMat("Sand", env, sand.albedo, sand.normal, Color.white, 0.2f, 0.12f, 0.8f);
                 var mRock = EnvMat("Rock", env, rockT.albedo, rockT.normal, Color.white, 0.35f, 0.2f, 1.2f);
                 var mCoral = EnvMat("Coral", env, coralT.albedo, coralT.normal, Color.white, 0.9f, 0.25f, 1f);
                 var mKelp = EnvMat("Kelp", env, kelpT.albedo, kelpT.normal, Color.white, 1.5f, 0.45f, 0.6f);
@@ -359,7 +359,7 @@ namespace OctoEvo.EditorTools
             bloom.tint.value = new Color(0.8f, 0.95f, 1f);
 
             var color = profile.Add<ColorAdjustments>(true);
-            color.postExposure.value = 0.35f;
+            color.postExposure.value = 0.55f;
             color.contrast.value = 12f;
             color.saturation.value = 6f;
 

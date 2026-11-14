@@ -17,14 +17,14 @@ namespace OctoEvo
         [Tooltip("Цвет рассеянного света в воде у поверхности")]
         public Color waterColor = new Color(0.06f, 0.33f, 0.42f);
         [Tooltip("Поглощение на метр по каналам: красный гаснет первым")]
-        public Vector3 absorption = new Vector3(0.11f, 0.035f, 0.022f);
+        public Vector3 absorption = new Vector3(0.07f, 0.028f, 0.018f);
         [Tooltip("Мутность: рассеяние на метр")]
-        public float scatter = 0.03f;
-        public float surfaceY = 14f;
+        public float scatter = 0.025f;
+        public float surfaceY = 10f;
 
         [Header("Каустика")]
         public Texture2D causticsTexture;
-        public float causticsStrength = 1.4f;
+        public float causticsStrength = 2.2f;
         public float causticsScale = 0.18f;
 
         [Header("Ссылки")]
