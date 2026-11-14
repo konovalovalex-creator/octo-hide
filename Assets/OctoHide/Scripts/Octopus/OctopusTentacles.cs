@@ -49,6 +49,7 @@ namespace OctoHide
         }
 
         Tentacle[] tentacles;
+        float liftNow;
         Mesh mesh;
         Vector3[] verts;
         Vector3[] normals;
@@ -132,7 +133,7 @@ namespace OctoHide
         Vector3 RootLocal(int t)
         {
             float a = (t + 0.5f) / tentacleCount * Mathf.PI * 2f;
-            return new Vector3(Mathf.Sin(a) * rootRing, rootHeight, Mathf.Cos(a) * rootRing);
+            return new Vector3(Mathf.Sin(a) * rootRing, rootHeight + liftNow, Mathf.Cos(a) * rootRing);
         }
 
         Vector3 RootWorld(Transform root, int t) => root.TransformPoint(RootLocal(t));
@@ -144,23 +145,41 @@ namespace OctoHide
             return root.TransformDirection(l.normalized);
         }
 
+        enum TentacleMode { Plant, Coil, Up, Trail }
+
+        struct PoseCfg
+        {
+            public TentacleMode mode;
+            public float reach;   // насколько далеко от тела ставить кончики (м)
+            public float arch;    // насколько щупальце выгибается вверх посередине (м)
+            public float wiggle;  // амплитуда шевеления
+            public PoseCfg(TentacleMode m, float r, float a, float w) { mode = m; reach = r; arch = a; wiggle = w; }
+        }
+
+        PoseCfg Cfg(OctopusPose pose)
+        {
+            switch (pose)
+            {
+                case OctopusPose.Rock:     return new PoseCfg(TentacleMode.Coil, 0.2f, 0.05f, 0.005f);
+                case OctopusPose.Flat:     return new PoseCfg(TentacleMode.Plant, reach * 1.25f, 0.05f, 0.015f);
+                case OctopusPose.Reach:    return new PoseCfg(TentacleMode.Plant, reach * 1.1f, 0.12f, 0.03f);
+                case OctopusPose.Coral:    return new PoseCfg(TentacleMode.Up, 0.25f, 0.1f, 0.06f);
+                case OctopusPose.Kelp:     return new PoseCfg(TentacleMode.Plant, 0.45f, 0.05f, 0.02f); // щупальца — «корни» у основания стебля
+                case OctopusPose.Starfish: return new PoseCfg(TentacleMode.Plant, length * 0.92f, 0.02f, 0.005f);
+                case OctopusPose.Snake:    return new PoseCfg(TentacleMode.Trail, length * 0.9f, 0.03f, 0.02f);
+                default:                   return new PoseCfg(TentacleMode.Plant, reach, 0.15f, 0.03f);
+            }
+        }
+
         void LateUpdate()
         {
             if (controller == null || tentacles == null) return;
             float dt = Mathf.Min(Time.deltaTime, 1f / 30f);
             Transform root = controller.transform;
-            OctopusPose pose = controller.Pose;
             bool grounded = controller.IsGrounded;
             Vector3 up = root.up;
-
-            float poseReach = reach;
-            float curl = 0f;
-            switch (pose)
-            {
-                case OctopusPose.Rock: poseReach = 0.25f; curl = 1f; break;
-                case OctopusPose.Flat: poseReach = reach * 1.25f; break;
-                case OctopusPose.Reach: poseReach = reach * 1.1f; break;
-            }
+            PoseCfg cfg = Cfg(controller.Pose);
+            liftNow = controller.BodyLift;
 
             // Сколько щупалец сейчас в шаге — шагаем «волнами», не всеми сразу
             int stepping = 0;
@@ -171,24 +190,39 @@ namespace OctoHide
                 var tc = tentacles[t];
                 Vector3 rootPos = RootWorld(root, t);
                 Vector3 outDir = OutWorld(root, t);
+                Vector3 side = Vector3.Cross(up, outDir);
 
                 // ---- Желаемое положение кончика
-                bool wantsPlant = grounded && curl < 0.5f;
+                bool wantsPlant = grounded && (cfg.mode == TentacleMode.Plant || cfg.mode == TentacleMode.Trail);
                 Vector3 desired;
                 if (wantsPlant)
                 {
-                    Vector3 guess = rootPos + outDir * poseReach + root.forward * controller.NormalizedSpeed * 0.25f;
-                    Vector3 castFrom = guess + up * 0.6f;
-                    if (Physics.Raycast(castFrom, -up, out RaycastHit hit, 1.6f, surfaceMask, QueryTriggerInteraction.Ignore)
+                    Vector3 guess;
+                    if (cfg.mode == TentacleMode.Trail)
+                    {
+                        // «Змея»: щупальца собраны пучком за телом
+                        float spread = (t - (tentacleCount - 1) * 0.5f) * 0.035f;
+                        guess = root.position - root.forward * cfg.reach + root.right * spread;
+                    }
+                    else
+                    {
+                        guess = rootPos + outDir * cfg.reach + root.forward * controller.NormalizedSpeed * 0.25f;
+                    }
+                    Vector3 castFrom = guess + up * (0.6f + Mathf.Max(0f, liftNow));
+                    if (Physics.Raycast(castFrom, -up, out RaycastHit hit, 1.6f + Mathf.Max(0f, liftNow), surfaceMask, QueryTriggerInteraction.Ignore)
                         && hit.collider.attachedRigidbody == null)
                         desired = hit.point + hit.normal * tipRadius;
                     else
                         desired = guess - up * 0.3f;
                 }
-                else if (curl > 0.5f)
+                else if (cfg.mode == TentacleMode.Coil)
                 {
-                    // «Камень»: щупальца поджаты под тело
                     desired = rootPos - up * 0.15f - outDir * 0.05f;
+                }
+                else if (cfg.mode == TentacleMode.Up && grounded)
+                {
+                    // «Коралл»: щупальца торчат вверх веточками
+                    desired = rootPos + up * length * 0.7f + outDir * cfg.reach + side * Mathf.Sin(t * 1.7f) * 0.1f;
                 }
                 else
                 {
@@ -203,8 +237,9 @@ namespace OctoHide
                     if (!tc.planted)
                     {
                         tc.planted = true;
-                        tc.foot = tc.footFrom = tc.footTo = desired;
-                        tc.stepT = 1f;
+                        tc.footFrom = tc.foot;
+                        tc.footTo = desired;
+                        tc.stepT = 0f;
                     }
                     else if (tc.stepT >= 1f)
                     {
@@ -234,20 +269,22 @@ namespace OctoHide
                     tc.foot = Vector3.Lerp(tc.foot, desired, 1f - Mathf.Exp(-6f * dt));
                 }
 
-                Simulate(tc, rootPos, outDir, up, curl, dt);
+                Simulate(tc, rootPos, outDir, up, cfg, dt);
             }
 
             RebuildMesh(root);
         }
 
-        void Simulate(Tentacle tc, Vector3 rootPos, Vector3 outDir, Vector3 up, float curl, float dt)
+        void Simulate(Tentacle tc, Vector3 rootPos, Vector3 outDir, Vector3 up, PoseCfg cfg, float dt)
         {
             int n = segments;
             float wave = Time.time * 3f + tc.phase * 6.28f;
+            Vector3 side = Vector3.Cross(up, outDir);
 
-            // Целевая форма: дуга от корня к кончику, приподнятая посередине
+            // Целевая форма: дуга от корня к кончику
             Vector3 tip = tc.foot;
-            Vector3 mid = (rootPos + tip) * 0.5f + up * (0.15f + curl * 0.05f);
+            Vector3 mid = (rootPos + tip) * 0.5f + up * cfg.arch;
+            if (cfg.mode == TentacleMode.Up) mid += outDir * 0.15f;
 
             for (int i = 1; i < n; i++)
             {
@@ -257,17 +294,22 @@ namespace OctoHide
 
                 float u = i / (float)(n - 1);
                 Vector3 shape = Bezier(rootPos, mid, tip, u);
-                if (curl > 0.5f)
+                if (cfg.mode == TentacleMode.Coil)
                 {
                     // спираль под телом
                     float ang = u * Mathf.PI * 1.6f;
-                    Vector3 side = Vector3.Cross(up, outDir);
                     shape = rootPos + (outDir * Mathf.Cos(ang) * 0.12f + side * Mathf.Sin(ang) * 0.06f - up * u * 0.12f) * (1f + u);
                 }
-                // лёгкое шевеление
-                shape += Vector3.Cross(up, outDir) * Mathf.Sin(wave + u * 5f) * 0.03f * u;
+                else if (cfg.mode == TentacleMode.Up)
+                {
+                    // кончик закручивается, как у ветки коралла
+                    shape += (outDir * Mathf.Sin(u * 4f) + side * Mathf.Cos(u * 3f + tc.phase * 3f)) * 0.05f * u;
+                }
+                shape += side * Mathf.Sin(wave + u * 5f) * cfg.wiggle * u;
 
-                Vector3 next = p + vel + Vector3.down * gravity * dt * dt;
+                // В позах «вверх» гравитация почти не тянет — щупальца держатся сами
+                float g = cfg.mode == TentacleMode.Up ? gravity * 0.1f : gravity;
+                Vector3 next = p + vel + Vector3.down * g * dt * dt;
                 tc.pos[i] = Vector3.Lerp(next, shape, 1f - Mathf.Exp(-shapeStiffness * dt));
             }
 
@@ -295,7 +337,7 @@ namespace OctoHide
                     }
                 }
                 // Кончик тянется к точке опоры
-                float pin = tc.planted ? 0.6f : 0.15f;
+                float pin = tc.planted ? 0.6f : (cfg.mode == TentacleMode.Up ? 0.4f : 0.15f);
                 tc.pos[n - 1] = Vector3.Lerp(tc.pos[n - 1], tc.foot, pin);
             }
         }

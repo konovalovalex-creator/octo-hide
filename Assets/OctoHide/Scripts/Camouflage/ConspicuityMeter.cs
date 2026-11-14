@@ -10,23 +10,29 @@ namespace OctoHide
     {
         public OctopusController controller;
         public OctopusSkin skin;
+        public OctopusEyes eyes;
 
         [Header("Веса")]
         public float colorWeight = 0.45f;
         public float alignWeight = 0.25f;
         public float motionWeight = 0.2f;
         public float papillaeWeight = 0.1f;
+        [Tooltip("Добавка к заметности, пока глаза открыты")]
+        public float openEyesPenalty = 0.12f;
 
         public float Value { get; private set; }
         public float ColorPart { get; private set; }
         public float AlignPart { get; private set; }
         public float MotionPart { get; private set; }
         public float PapillaePart { get; private set; }
+        public float EyesPart { get; private set; }
+        public float RipplePart { get; private set; }
 
         void Awake()
         {
             if (controller == null) controller = GetComponent<OctopusController>();
             if (skin == null) skin = GetComponent<OctopusSkin>();
+            if (eyes == null) eyes = GetComponent<OctopusEyes>();
         }
 
         void Update()
@@ -62,7 +68,12 @@ namespace OctoHide
                 PapillaePart = 0.5f;
             }
 
-            float target = Mathf.Clamp01(ColorPart * colorWeight + AlignPart * alignWeight + MotionPart * motionWeight + PapillaePart * papillaeWeight);
+            EyesPart = eyes != null ? 1f - eyes.Closed : 1f;
+            float target = Mathf.Clamp01(ColorPart * colorWeight + AlignPart * alignWeight + MotionPart * motionWeight
+                                         + PapillaePart * papillaeWeight + EyesPart * openEyesPenalty);
+            // Рябь от попадания выдаёт сразу и сильно
+            RipplePart = skin.RippleAmount;
+            target = Mathf.Max(target, RipplePart);
             Value = Mathf.MoveTowards(Value, target, Time.deltaTime * 2f);
         }
     }

@@ -2,7 +2,17 @@ using UnityEngine;
 
 namespace OctoHide
 {
-    public enum OctopusPose { Normal = 0, Rock = 1, Flat = 2, Reach = 3 }
+    public enum OctopusPose
+    {
+        Normal = 0,   // обычная
+        Rock = 1,     // камень: щупальца поджаты
+        Flat = 2,     // распластаться
+        Reach = 3,    // вытянуться
+        Coral = 4,    // коралл: щупальца вверх, как ветки
+        Kelp = 5,     // водоросль: тело поднято на «стебле» и покачивается
+        Starfish = 6, // морская звезда: плоско, щупальца лучами
+        Snake = 7     // морская змея: щупальца собраны в «хвост»
+    }
 
     /// <summary>
     /// Передвижение осьминога: ползание по любой поверхности (дно, стены, потолок),
@@ -31,6 +41,10 @@ namespace OctoHide
         [Header("Поворот")]
         public float alignSpeed = 8f;
         public float turnSpeed = 10f;
+
+        [Header("Игрок")]
+        [Tooltip("Управляется с клавиатуры этого компьютера. У манекенов и (позже) у чужих осьминогов — выключено.")]
+        public bool isLocalPlayer = true;
 
         [Header("Ссылки")]
         public Transform cameraTransform;
@@ -61,9 +75,23 @@ namespace OctoHide
             new Vector3(1.05f, 0.95f, 1.00f), // Rock — компактный «камень»
             new Vector3(1.35f, 0.45f, 1.35f), // Flat — распластаться
             new Vector3(0.80f, 0.90f, 1.45f), // Reach — вытянуться
+            new Vector3(1.10f, 0.70f, 1.10f), // Coral
+            new Vector3(0.70f, 1.45f, 0.70f), // Kelp
+            new Vector3(1.20f, 0.35f, 1.20f), // Starfish
+            new Vector3(0.60f, 0.60f, 1.60f), // Snake
         };
-        static readonly float[] PoseDrop = { 0f, -0.05f, -0.18f, 0f };
-        static readonly float[] PoseSpeedMul = { 1f, 0.35f, 0.5f, 0.8f };
+        static readonly float[] PoseDrop = { 0f, -0.05f, -0.18f, 0f, -0.12f, 0.45f, -0.2f, -0.1f };
+        static readonly float[] PoseSpeedMul = { 1f, 0.35f, 0.5f, 0.8f, 0.3f, 0.25f, 0.4f, 0.9f };
+
+        /// <summary>На сколько тело сейчас поднято/опущено относительно обычного положения (м).</summary>
+        public float BodyLift => body != null ? body.localPosition.y - bodyBasePos.y : 0f;
+
+        /// <summary>Все осьминоги на сцене — для рыб, крабов, камней и (позже) ботов.</summary>
+        public static readonly System.Collections.Generic.List<OctopusController> All = new System.Collections.Generic.List<OctopusController>();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
+
+        public void SetPose(OctopusPose pose) => Pose = pose;
 
         void Awake()
         {
@@ -84,13 +112,17 @@ namespace OctoHide
 
         void Update()
         {
-            Vector2 input = OctoInput.Move;
-            moveInputWorld = CameraRelative(input);
+            if (isLocalPlayer)
+            {
+                Vector2 input = OctoInput.Move;
+                moveInputWorld = CameraRelative(input);
 
-            if (OctoInput.JetPressed && Time.time >= nextJetTime) jetRequested = true;
+                if (OctoInput.JetPressed && Time.time >= nextJetTime) jetRequested = true;
 
-            int pose = OctoInput.PosePressed;
-            if (pose >= 0) Pose = (OctopusPose)pose;
+                int pose = OctoInput.PosePressed;
+                if (pose >= 0) Pose = (OctopusPose)pose;
+            }
+            else moveInputWorld = Vector3.zero;
 
             AnimateBody();
         }
@@ -228,6 +260,12 @@ namespace OctoHide
             float k = 1f - Mathf.Exp(-6f * Time.deltaTime);
             body.localScale = Vector3.Lerp(body.localScale, targetScale, k);
             body.localPosition = Vector3.Lerp(body.localPosition, targetPos, k);
+
+            // «Водоросль» покачивается на течении
+            Quaternion targetRot = Quaternion.identity;
+            if (Pose == OctopusPose.Kelp)
+                targetRot = Quaternion.Euler(Mathf.Sin(Time.time * 1.3f) * 7f, 0f, Mathf.Sin(Time.time * 0.9f + 1f) * 5f);
+            body.localRotation = Quaternion.Slerp(body.localRotation, targetRot, k);
         }
     }
 }

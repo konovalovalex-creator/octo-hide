@@ -64,6 +64,8 @@ namespace OctoHide
         public static bool PapillaeUp => Held(KeyCode.X);
         public static bool PapillaeDown => Held(KeyCode.Z);
         public static bool UnlockCursorPressed => Down(KeyCode.Escape);
+        public static bool EyesTogglePressed => Down(KeyCode.Q);
+        public static bool ThrowPressed => Down(KeyCode.F);
         public static bool ClickPressed
         {
             get
@@ -76,15 +78,19 @@ namespace OctoHide
             }
         }
 
-        /// <summary>Возвращает индекс позы 0..3, если в этом кадре нажата 1..4, иначе -1.</summary>
+        static readonly KeyCode[] PoseKeys =
+        {
+            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4,
+            KeyCode.Alpha5, KeyCode.Alpha6, KeyCode.Alpha7, KeyCode.Alpha8
+        };
+
+        /// <summary>Возвращает индекс позы 0..7, если в этом кадре нажата 1..8, иначе -1.</summary>
         public static int PosePressed
         {
             get
             {
-                if (Down(KeyCode.Alpha1)) return 0;
-                if (Down(KeyCode.Alpha2)) return 1;
-                if (Down(KeyCode.Alpha3)) return 2;
-                if (Down(KeyCode.Alpha4)) return 3;
+                for (int i = 0; i < PoseKeys.Length; i++)
+                    if (Down(PoseKeys[i])) return i;
                 return -1;
             }
         }
@@ -126,10 +132,16 @@ namespace OctoHide
                 case KeyCode.X: return k.xKey;
                 case KeyCode.Z: return k.zKey;
                 case KeyCode.Escape: return k.escapeKey;
+                case KeyCode.Q: return k.qKey;
+                case KeyCode.F: return k.fKey;
                 case KeyCode.Alpha1: return k.digit1Key;
                 case KeyCode.Alpha2: return k.digit2Key;
                 case KeyCode.Alpha3: return k.digit3Key;
                 case KeyCode.Alpha4: return k.digit4Key;
+                case KeyCode.Alpha5: return k.digit5Key;
+                case KeyCode.Alpha6: return k.digit6Key;
+                case KeyCode.Alpha7: return k.digit7Key;
+                case KeyCode.Alpha8: return k.digit8Key;
                 default: return null;
             }
         }

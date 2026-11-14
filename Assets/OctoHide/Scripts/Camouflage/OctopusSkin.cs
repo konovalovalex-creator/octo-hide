@@ -39,6 +39,7 @@ namespace OctoHide
             new Color(0.25f, 0.2f, 0.18f),
         };
 
+        public Material SkinMaterial => mat;
         public CamoState Current => stateB;
         public CamoState Previous => stateA;
         public float Blend => blend;
@@ -47,6 +48,30 @@ namespace OctoHide
         public float Papillae => papillae;
         public string LastMessage { get; private set; } = "";
         public float LastMessageTime { get; private set; } = -10f;
+
+        [Header("Рябь от попадания")]
+        public float rippleDuration = 2.5f;
+
+        /// <summary>0..1 — насколько сейчас видна рябь от попадания камнем.</summary>
+        public float RippleAmount => Mathf.Clamp01(1f - (Time.time - rippleStart) / rippleDuration) * rippleStrength;
+        public int TimesHit { get; private set; }
+
+        Vector3 rippleLocal;
+        float rippleStart = -100f;
+        float rippleStrength;
+
+        /// <summary>Попадание (камнем и т.п.): по коже расходится рябь, маскировка сбивается.</summary>
+        public void Disturb(Vector3 worldPoint, float strength)
+        {
+            rippleLocal = transform.InverseTransformPoint(worldPoint);
+            rippleStart = Time.time;
+            rippleStrength = Mathf.Clamp01(strength);
+            TimesHit++;
+            papillae = Mathf.Min(1f, papillae + 0.3f); // кожа «вздрагивает»
+            Say("В тебя попали!");
+        }
+
+        public void SetPapillae(float value) => papillaeTarget = Mathf.Clamp01(value);
 
         Material mat;
         CamoState stateA, stateB;
@@ -60,6 +85,8 @@ namespace OctoHide
             ScaleB = Shader.PropertyToID("_ScaleB"), AvgB = Shader.PropertyToID("_AvgB"), CapB = Shader.PropertyToID("_CapB");
         static readonly int BlendId = Shader.PropertyToID("_Blend"), PapId = Shader.PropertyToID("_Papillae"),
             SmearId = Shader.PropertyToID("_Smear");
+        static readonly int RippleCenterId = Shader.PropertyToID("_RippleCenter"), RippleTimeId = Shader.PropertyToID("_RippleTime"),
+            RippleStrengthId = Shader.PropertyToID("_RippleStrength");
 
         void Awake()
         {
@@ -92,12 +119,15 @@ namespace OctoHide
         {
             if (mat == null) return;
 
-            if (OctoInput.SamplePressed) TrySampleSurface();
-            if (OctoInput.CyclePalettePressed) TryPalette();
-            if (OctoInput.ResetSkinPressed) StartTransition(PaletteState(defaultColor), 0f, "Обычный окрас");
+            if (controller == null || controller.isLocalPlayer)
+            {
+                if (OctoInput.SamplePressed) TrySampleSurface();
+                if (OctoInput.CyclePalettePressed) TryPalette();
+                if (OctoInput.ResetSkinPressed) StartTransition(PaletteState(defaultColor), 0f, "Обычный окрас");
 
-            if (OctoInput.PapillaeUp) papillaeTarget = Mathf.Clamp01(papillaeTarget + papillaeSpeed * Time.deltaTime);
-            if (OctoInput.PapillaeDown) papillaeTarget = Mathf.Clamp01(papillaeTarget - papillaeSpeed * Time.deltaTime);
+                if (OctoInput.PapillaeUp) papillaeTarget = Mathf.Clamp01(papillaeTarget + papillaeSpeed * Time.deltaTime);
+                if (OctoInput.PapillaeDown) papillaeTarget = Mathf.Clamp01(papillaeTarget - papillaeSpeed * Time.deltaTime);
+            }
             papillae = Mathf.MoveTowards(papillae, papillaeTarget, papillaeSpeed * 1.5f * Time.deltaTime);
 
             if (blend < 1f)
@@ -193,7 +223,10 @@ namespace OctoHide
 
             mat.SetFloat(BlendId, blend);
             mat.SetFloat(PapId, papillae);
-            mat.SetFloat(SmearId, smear);
+            mat.SetFloat(SmearId, Mathf.Max(smear, RippleAmount * 0.5f));
+            mat.SetVector(RippleCenterId, transform.TransformPoint(rippleLocal));
+            mat.SetFloat(RippleTimeId, Time.time - rippleStart);
+            mat.SetFloat(RippleStrengthId, RippleAmount > 0f ? rippleStrength : 0f);
         }
 
         void Say(string msg)

@@ -25,6 +25,9 @@ Shader "OctoHide/OctopusSkin"
         _PapillaeHeight ("Papillae Height (m)", Float) = 0.035
         _PapillaeFreq ("Papillae Frequency", Float) = 14
         _Smear ("Movement Smear", Range(0,1)) = 0
+        _RippleCenter ("Ripple Center (world)", Vector) = (0,0,0,0)
+        _RippleTime ("Ripple Age (s)", Float) = 100
+        _RippleStrength ("Ripple Strength", Range(0,1)) = 0
 
         _RampThreshold ("Ramp Threshold", Range(0,1)) = 0.25
         _RampSmooth ("Ramp Smooth", Range(0.001,0.5)) = 0.08
@@ -56,6 +59,9 @@ Shader "OctoHide/OctopusSkin"
             float _PapillaeHeight;
             float _PapillaeFreq;
             half _Smear;
+            float4 _RippleCenter;
+            float _RippleTime;
+            half _RippleStrength;
             half _RampThreshold;
             half _RampSmooth;
             half _ShadowStrength;
@@ -135,6 +141,18 @@ Shader "OctoHide/OctopusSkin"
                 float edge = 1.0 - abs(mask * 2.0 - 1.0);
                 half3 albedo = lerp(colA, colB, mask);
                 albedo = lerp(albedo, _EdgeColor.rgb, edge * 0.6 * step(0.001, 1.0 - _Blend));
+
+                // Рябь от попадания: кольца расходятся от точки удара, узор мерцает
+                if (_RippleStrength > 0.001)
+                {
+                    float rd = distance(i.positionWS, _RippleCenter.xyz);
+                    float age = _RippleTime;
+                    float fade = saturate(1.0 - age / 2.5) * _RippleStrength;
+                    float rings = sin(rd * 45.0 - age * 16.0) * exp(-rd * 2.0) * fade;
+                    float front = exp(-pow((rd - age * 1.4) * 7.0, 2.0)) * fade;
+                    albedo *= 1.0 + rings * 0.8;
+                    albedo = lerp(albedo, _EdgeColor.rgb * 0.5 + 0.5, saturate(front * 0.6));
+                }
 
                 // Папиллы: фейковое затенение впадин + огранка нормали
                 float bumps = pow(OctoValueNoise(bodyPos * _PapillaeFreq), 3.0);
