@@ -27,6 +27,3 @@ crashlytics-build.properties
 .idea/
 .vscode/
 .DS_Store
-# Генерируется кнопкой OctoHide → Build Prototype Scene
-/Assets/OctoHide/Generated/
-/Assets/OctoHide/Generated.meta
