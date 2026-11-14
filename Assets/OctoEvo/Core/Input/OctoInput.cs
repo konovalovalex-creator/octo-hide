@@ -23,25 +23,36 @@ namespace OctoEvo
                 var gp = Gamepad.current;
                 Vector2 v = new Vector2(x, y);
                 if (gp != null) v += gp.leftStick.ReadValue();
-                return Vector2.ClampMagnitude(v, 1f);
+                return Vector2.ClampMagnitude(v + TouchInputState.Move, 1f);
 #else
-                return Vector2.ClampMagnitude(new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")), 1f);
+                return Vector2.ClampMagnitude(new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) + TouchInputState.Move, 1f);
 #endif
             }
         }
 
-        public static Vector2 Look
+        /// <summary>Обзор мышью (только когда курсор захвачен — проверяет камера).</summary>
+        public static Vector2 MouseLook
         {
             get
             {
 #if ENABLE_INPUT_SYSTEM
-                Vector2 v = Vector2.zero;
-                if (Mouse.current != null) v += Mouse.current.delta.ReadValue() * 0.1f;
-                if (Gamepad.current != null) v += Gamepad.current.rightStick.ReadValue() * 3f;
-                return v;
+                return Mouse.current != null ? Mouse.current.delta.ReadValue() * 0.1f : Vector2.zero;
 #else
                 return new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
 #endif
+            }
+        }
+
+        /// <summary>Обзор стиком геймпада и пальцем по экрану.</summary>
+        public static Vector2 StickAndTouchLook
+        {
+            get
+            {
+                Vector2 v = TouchInputState.ConsumeLook();
+#if ENABLE_INPUT_SYSTEM
+                if (Gamepad.current != null) v += Gamepad.current.rightStick.ReadValue() * 3f;
+#endif
+                return v;
             }
         }
 
@@ -57,15 +68,30 @@ namespace OctoEvo
             }
         }
 
-        public static bool JetPressed => Down(KeyCode.Space);
-        public static bool SamplePressed => Down(KeyCode.E);
+        public static bool JetPressed => Down(KeyCode.Space) | TouchInputState.ConsumeJet();
+        public static bool SamplePressed => Down(KeyCode.E) | TouchInputState.ConsumeCamo();
+        public static bool InkPressed => Down(KeyCode.F) | TouchInputState.ConsumeInk();
+        public static bool PoseCyclePressed => TouchInputState.ConsumePose();
+        public static bool AttackPressed
+        {
+            get
+            {
+                bool touch = TouchInputState.ConsumeAttack();
+#if ENABLE_INPUT_SYSTEM
+                bool mouse = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && Cursor.lockState == CursorLockMode.Locked;
+#else
+                bool mouse = Input.GetMouseButtonDown(0) && Cursor.lockState == CursorLockMode.Locked;
+#endif
+                return touch | mouse;
+            }
+        }
+        public static bool ToggleTouchUiPressed => Down(KeyCode.F2);
         public static bool ResetSkinPressed => Down(KeyCode.R);
         public static bool CyclePalettePressed => Down(KeyCode.C);
         public static bool PapillaeUp => Held(KeyCode.X);
         public static bool PapillaeDown => Held(KeyCode.Z);
         public static bool UnlockCursorPressed => Down(KeyCode.Escape);
         public static bool EyesTogglePressed => Down(KeyCode.Q);
-        public static bool ThrowPressed => Down(KeyCode.F);
         public static bool ClickPressed
         {
             get
@@ -134,6 +160,7 @@ namespace OctoEvo
                 case KeyCode.Escape: return k.escapeKey;
                 case KeyCode.Q: return k.qKey;
                 case KeyCode.F: return k.fKey;
+                case KeyCode.F2: return k.f2Key;
                 case KeyCode.Alpha1: return k.digit1Key;
                 case KeyCode.Alpha2: return k.digit2Key;
                 case KeyCode.Alpha3: return k.digit3Key;

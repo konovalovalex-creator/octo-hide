@@ -154,7 +154,7 @@ Shader "OctoEvo/OctopusSkinLit"
 
                 // Папиллы: рельеф кожи через градиент шума (нормаль) + затенение впадин
                 float h0 = pow(OctoValueNoise(bodyPos * _PapillaeFreq), 3.0);
-                const float e = 0.02;
+                float e = 0.3 / max(1.0, _PapillaeFreq);
                 float hx = pow(OctoValueNoise((bodyPos + float3(e, 0, 0)) * _PapillaeFreq), 3.0);
                 float hy = pow(OctoValueNoise((bodyPos + float3(0, e, 0)) * _PapillaeFreq), 3.0);
                 float hz = pow(OctoValueNoise((bodyPos + float3(0, 0, e)) * _PapillaeFreq), 3.0);

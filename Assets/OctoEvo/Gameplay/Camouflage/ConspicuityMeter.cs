@@ -54,7 +54,7 @@ namespace OctoEvo
                     Vector3 p = transform.position;
                     float shift = (d.MultiplyPoint3x4(p) - p).magnitude;
                     float angle = Quaternion.Angle(Quaternion.identity, d.rotation);
-                    AlignPart = Mathf.Clamp01(shift / 0.6f + angle / 45f);
+                    AlignPart = Mathf.Clamp01(shift / (0.6f * Mathf.Max(0.01f, transform.lossyScale.x)) + angle / 45f);
                 }
                 else AlignPart = 1f;
 

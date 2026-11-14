@@ -12,6 +12,8 @@
     "name": "OctoEvo.UI",
     "references": [
         "OctoEvo.Core",
-        "OctoEvo.Gameplay"
+        "OctoEvo.Gameplay",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ]
 }

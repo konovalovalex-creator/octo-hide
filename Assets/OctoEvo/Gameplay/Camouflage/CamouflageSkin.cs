@@ -100,6 +100,8 @@ namespace OctoEvo
                 return;
             }
             mat = new Material(src) { name = src.name + " (Instance)" };
+            basePapFreq = mat.HasProperty(PapFreqId) ? mat.GetFloat(PapFreqId) : 14f;
+            basePapHeight = mat.HasProperty(PapHeightId) ? mat.GetFloat(PapHeightId) : 0.035f;
             foreach (var r in skinRenderers) if (r != null) r.sharedMaterial = mat;
 
             stateB = PaletteState(defaultColor);
@@ -151,7 +153,7 @@ namespace OctoEvo
             if (col == null)
             {
                 // В толще воды — ищем поверхность под собой
-                if (Physics.Raycast(transform.position, -transform.up, out RaycastHit hit, sampleRange, ~0, QueryTriggerInteraction.Ignore)
+                if (Physics.Raycast(transform.position, -transform.up, out RaycastHit hit, sampleRange * transform.lossyScale.x, ~0, QueryTriggerInteraction.Ignore)
                     && hit.collider.attachedRigidbody == null)
                     col = hit.collider;
             }
@@ -223,11 +225,19 @@ namespace OctoEvo
 
             mat.SetFloat(BlendId, blend);
             mat.SetFloat(PapId, papillae);
+            // Пупырышки растут вместе с осьминогом, а не остаются «метровыми»
+            float sc = Mathf.Max(0.01f, transform.lossyScale.x);
+            mat.SetFloat(PapFreqId, basePapFreq / sc);
+            mat.SetFloat(PapHeightId, basePapHeight * sc);
             mat.SetFloat(SmearId, Mathf.Max(smear, RippleAmount * 0.5f));
             mat.SetVector(RippleCenterId, transform.TransformPoint(rippleLocal));
             mat.SetFloat(RippleTimeId, Time.time - rippleStart);
             mat.SetFloat(RippleStrengthId, RippleAmount > 0f ? rippleStrength : 0f);
         }
+
+        static readonly int PapFreqId = Shader.PropertyToID("_PapillaeFreq");
+        static readonly int PapHeightId = Shader.PropertyToID("_PapillaeHeight");
+        float basePapFreq = 14f, basePapHeight = 0.035f;
 
         void Say(string msg)
         {

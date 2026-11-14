@@ -30,7 +30,8 @@ namespace OctoEvo.EditorTools
             Shader ray = Shader.Find("OctoEvo/GodRay");
             Shader particle = Shader.Find("OctoEvo/SoftParticle");
             Shader surface = Shader.Find("OctoEvo/WaterSurfaceUnder");
-            if (env == null || skin == null || ray == null || particle == null || surface == null)
+            Shader creatureShader = Shader.Find("OctoEvo/CreatureLit");
+            if (env == null || skin == null || ray == null || particle == null || surface == null || creatureShader == null)
             {
                 EditorUtility.DisplayDialog("OctoEvo", "Не найдены шейдеры OctoEvo. Проверьте консоль на ошибки компиляции шейдеров.", "OK");
                 return;
@@ -67,6 +68,16 @@ namespace OctoEvo.EditorTools
                 var mSnow = SaveMat(new Material(particle), "MarineSnow");
                 mSnow.SetTexture("_BaseMap", dot);
                 var mSurface = SaveMat(new Material(surface), "WaterSurface");
+                var mCreature = SaveMat(new Material(creatureShader) { enableInstancing = true }, "Creature");
+                var mInk = SaveMat(new Material(particle), "Ink");
+                mInk.SetTexture("_BaseMap", dot);
+                mInk.SetColor("_BaseColor", Color.white);
+
+                EditorUtility.DisplayProgressBar("OctoEvo", "Виды существ…", 0.62f);
+                var species = CreatureSpecies.EnsureAll();
+
+                // Маленький осьминог (~2.5 см коллайдер) — уменьшаем зазор контакта, чтобы не «парил» над камнями
+                Physics.defaultContactOffset = 0.002f;
 
                 EditorUtility.DisplayProgressBar("OctoEvo", "Сцена…", 0.7f);
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -248,33 +259,45 @@ namespace OctoEvo.EditorTools
                     if (s < 0.25f) Object.DestroyImmediate(go.GetComponent<Collider>());
                 }
 
-                // ---------- Живность (временные модели — заменим на реалистичные на этапе 2)
-                var fauna = new GameObject("Fauna").transform;
-                AddSchool(fauna, new Vector3(4f, 3f, -8f), 16, new Color(0.85f, 0.8f, 0.5f), 1f, mPlain);
-                AddSchool(fauna, new Vector3(-8f, 4f, 6f), 14, new Color(0.7f, 0.78f, 0.85f), 0.9f, mPlain);
-                AddSchool(fauna, new Vector3(12f, 2.5f, -14f), 10, new Color(0.9f, 0.55f, 0.3f), 1.2f, mPlain);
-                for (int i = 0; i < 8; i++)
-                {
-                    var p = new Vector3(Rand(rnd, -16f, 16f), 0.3f, Rand(rnd, -16f, 16f));
-                    if (p.magnitude < 4f) continue;
-                    var crab = new GameObject("Crab_" + i).AddComponent<Crab>();
-                    crab.transform.SetParent(fauna);
-                    crab.transform.position = p + Vector3.up * GroundY(p);
-                    crab.transform.rotation = Quaternion.Euler(0f, Rand(rnd, 0, 360), 0f);
-                    crab.shellMaterial = mPlain;
-                    crab.size = Rand(rnd, 0.8f, 1.3f);
-                    crab.shellColor = Color.Lerp(new Color(0.55f, 0.25f, 0.15f), new Color(0.6f, 0.45f, 0.3f), (float)rnd.NextDouble());
-                }
-
                 // ---------- Осьминог
-                var octo = BuildOctopus(new Vector3(0f, 0.8f, 0f), mSkin, mEye, mPupil, camGo.transform);
+                var octo = BuildOctopus(new Vector3(0f, GroundY(Vector3.zero) + 0.15f, 0f), mSkin, mEye, mPupil, camGo.transform);
                 orbit.target = octo.transform;
+
+                var growth = octo.AddComponent<GrowthSystem>();
+                growth.milestones = species;
+                octo.transform.localScale = Vector3.one * (growth.startLength / growth.modelLength);
+                var grab = octo.AddComponent<GrabSystem>();
+                grab.motor = octo.GetComponent<OctopusMotor>();
+                grab.growth = growth;
+                grab.rig = octo.GetComponentInChildren<TentacleRig>();
+                var ink = octo.AddComponent<InkAbility>();
+                ink.motor = grab.motor;
+                ink.growth = growth;
+                ink.inkMaterial = mInk;
+
+                // ---------- Живность
+                var spawnerGo = new GameObject("SpawnDirector");
+                var spawner = spawnerGo.AddComponent<SpawnDirector>();
+                spawner.species = species;
+                spawner.creatureMaterial = mCreature;
+                spawner.player = grab.motor;
+                spawner.growth = growth;
+                spawner.meter = octo.GetComponent<ConspicuityMeter>();
+                spawner.areaCenter = Vector3.zero;
+                spawner.areaSize = new Vector2(90f, 90f);
+
+                // ---------- Сенсорное управление (на ПК скрыто, F2 — показать)
+                new GameObject("TouchControls").AddComponent<TouchControls>();
 
                 // ---------- HUD
                 var hud = new GameObject("DebugHUD").AddComponent<DebugHUD>();
                 hud.motor = octo.GetComponent<OctopusMotor>();
                 hud.skin = octo.GetComponent<CamouflageSkin>();
                 hud.meter = octo.GetComponent<ConspicuityMeter>();
+                hud.growth = growth;
+                hud.grab = grab;
+                hud.ink = ink;
+                hud.spawner = spawner;
 
                 ProceduralAssets.EnsureFolder("Assets/OctoEvo/Scenes");
                 EditorSceneManager.SaveScene(scene, ScenePath);
@@ -436,18 +459,6 @@ namespace OctoEvo.EditorTools
             var mpb = new MaterialPropertyBlock();
             mpb.SetColor("_BaseColor", c);
             go.GetComponent<Renderer>().SetPropertyBlock(mpb);
-        }
-
-        static void AddSchool(Transform parent, Vector3 pos, int count, Color tint, float size, Material mat)
-        {
-            var go = new GameObject("FishSchool");
-            go.transform.SetParent(parent);
-            go.transform.position = pos;
-            var s = go.AddComponent<FishSchool>();
-            s.count = count;
-            s.tint = tint;
-            s.size = size;
-            s.material = mat;
         }
 
         static float Rand(System.Random r, float a, float b) => a + (float)r.NextDouble() * (b - a);
