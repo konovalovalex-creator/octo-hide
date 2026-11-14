@@ -42,7 +42,7 @@ namespace OctoEvo
             MotionPart = controller.NormalizedSpeed;
 
             if (controller.SurfaceCollider != null &&
-                CamoSurface.TryGetState(controller.SurfaceCollider, transform.localToWorldMatrix, out CamoState surface))
+                CamoSurface.TryGetState(controller.SurfaceCollider, transform.localToWorldMatrix, controller.SurfaceNormal, out CamoState surface))
             {
                 ColorPart = Mathf.Clamp01(CamoUtil.DeltaE(skin.EffectiveAverage, surface.average) / 40f);
 

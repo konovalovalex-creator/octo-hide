@@ -17,6 +17,11 @@ Shader "OctoEvo/OctopusSkinLit"
         _ScaleB ("Scale B", Float) = 2
         _AvgB ("Average B", Color) = (0.7,0.27,0.23,1)
 
+        [NoScaleOffset] _Tex2A ("Pattern A layer 2", 2D) = "white" {}
+        [NoScaleOffset] _Tex2B ("Pattern B layer 2", 2D) = "white" {}
+        _LayerA ("Layer A (patch size, bias, sharpness, scale2)", Vector) = (0,0,6,0)
+        _LayerB ("Layer B (patch size, bias, sharpness, scale2)", Vector) = (0,0,6,0)
+
         _Blend ("Transition A→B", Range(0,1)) = 1
         _WaveScale ("Chromatophore Wave Scale", Float) = 6
         _EdgeColor ("Wave Edge Color", Color) = (0.15,0.05,0.05,1)
@@ -54,6 +59,7 @@ Shader "OctoEvo/OctopusSkinLit"
 
         TEXTURE2D(_TexA); SAMPLER(sampler_TexA);
         TEXTURE2D(_TexB); SAMPLER(sampler_TexB);
+        TEXTURE2D(_Tex2A); TEXTURE2D(_Tex2B);
         TEXTURE2D(_NaturalMap); SAMPLER(sampler_NaturalMap);
         TEXTURE2D(_NaturalNormal); SAMPLER(sampler_NaturalNormal);
 
@@ -62,6 +68,8 @@ Shader "OctoEvo/OctopusSkinLit"
             float4x4 _CapB;
             half4 _TintA; half4 _AvgA; float _ScaleA;
             half4 _TintB; half4 _AvgB; float _ScaleB;
+            float4 _LayerA;
+            float4 _LayerB;
             half _Blend;
             float _WaveScale;
             half4 _EdgeColor;
@@ -130,11 +138,20 @@ Shader "OctoEvo/OctopusSkinLit"
                 return o;
             }
 
-            half3 SampleState(TEXTURE2D_PARAM(tex, smp), float4x4 cap, float3 posWS, float3 nWS, float scale, half4 tint, half4 avg)
+            half3 SampleState(TEXTURE2D_PARAM(tex, smp), TEXTURE2D(tex2), float4 layer, float4x4 cap, float3 posWS, float3 nWS, float scale, half4 tint, half4 avg)
             {
                 float3 p = ApplyCap(cap, posWS);
                 float3 n = normalize(ApplyCapDir(cap, nWS));
-                half3 c = OctoTriplanar(TEXTURE2D_ARGS(tex, smp), p, n, scale).rgb * tint.rgb;
+                half3 c = OctoTriplanar(TEXTURE2D_ARGS(tex, smp), p, n, scale).rgb;
+                // Второй слой поверхности (мох, гравий): те же пятна, что на камне под осьминогом
+                if (layer.w > 0.0)
+                {
+                    float m = OctoFbm(p * layer.x) + layer.y;
+                    m = saturate((m - 0.5) * layer.z + 0.5);
+                    half3 c2 = OctoTriplanar(TEXTURE2D_ARGS(tex2, smp), p, n, layer.w).rgb;
+                    c = lerp(c, c2, m);
+                }
+                c *= tint.rgb;
                 // В движении узор «плывёт» и усредняется
                 return lerp(c, avg.rgb, _Smear);
             }
@@ -152,8 +169,8 @@ Shader "OctoEvo/OctopusSkinLit"
                     n = normalize(lerp(n, mul(nTS, float3x3(t, b, n)), _UseNatural));
                 }
 
-                half3 colA = SampleState(TEXTURE2D_ARGS(_TexA, sampler_TexA), _CapA, i.positionWS, n, _ScaleA, _TintA, _AvgA);
-                half3 colB = SampleState(TEXTURE2D_ARGS(_TexB, sampler_TexB), _CapB, i.positionWS, n, _ScaleB, _TintB, _AvgB);
+                half3 colA = SampleState(TEXTURE2D_ARGS(_TexA, sampler_TexA), _Tex2A, _LayerA, _CapA, i.positionWS, n, _ScaleA, _TintA, _AvgA);
+                half3 colB = SampleState(TEXTURE2D_ARGS(_TexB, sampler_TexB), _Tex2B, _LayerB, _CapB, i.positionWS, n, _ScaleB, _TintB, _AvgB);
                 // Естественный окрас модели (из Tripo) — когда маскировка не включена
                 colA = lerp(colA, natural, _NaturalA * _UseNatural);
                 colB = lerp(colB, natural, _NaturalB * _UseNatural);

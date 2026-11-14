@@ -19,11 +19,12 @@ namespace OctoEvo
         [Header("Захват")]
         public bool autoGrab = true;
         [Tooltip("Дальность автозахвата в долях длины щупальца")]
-        public float autoReach = 0.75f;
-        public float manualReach = 1.1f;
+        public float autoReach = 1.2f;
+        [Tooltip("Дальность броска по кнопке, в длинах щупальца: осьминог прыгает к добыче")]
+        public float manualReach = 3.5f;
         [Tooltip("Конус автозахвата: косинус угла от «вперёд»")]
         public float autoConeDot = 0.3f;
-        public float reachTimeout = 0.45f;
+        public float reachTimeout = 0.9f;
         public float missCooldown = 0.6f;
 
         [Header("Поедание")]
@@ -113,6 +114,11 @@ namespace OctoEvo
             tentacle = rig.ReachTo(best.transform);
             if (tentacle < 0) { Target = null; return; }
             AudioDirector.Play(Sfx.TentacleShot, transform.position, 0.7f);
+            // Далеко — бросок всем телом
+            Vector3 toTarget = best.transform.position - pos;
+            float arm = rig.WorldLength;
+            if (motor != null && toTarget.magnitude > arm * 0.8f)
+                motor.Lunge(toTarget.normalized * Mathf.Max(toTarget.magnitude / 0.3f, motor.swimSpeed * motor.SpeedScale) + best.Velocity * 0.5f);
             timer = 0f;
             Current = Phase.Reaching;
         }
@@ -126,8 +132,10 @@ namespace OctoEvo
             }
             timer += Time.deltaTime;
             Vector3 tip = rig.TipPosition(tentacle);
-            float catchDist = Target.Radius + rig.WorldLength * 0.12f;
-            if ((tip - Target.transform.position).sqrMagnitude < catchDist * catchDist)
+            float catchDist = Target.Radius + rig.WorldLength * 0.2f;
+            float bodyDist = Target.Radius + rig.WorldLength * 0.6f;
+            Vector3 tp = Target.transform.position;
+            if ((tip - tp).sqrMagnitude < catchDist * catchDist || (transform.position - tp).sqrMagnitude < bodyDist * bodyDist)
             {
                 Target.SetGrabbed(true);
                 AudioDirector.Play(Sfx.Grab, Target.transform.position, 0.8f);
@@ -141,7 +149,7 @@ namespace OctoEvo
                 return;
             }
 
-            float maxRange = rig.WorldLength * manualReach * 1.3f + Target.Radius;
+            float maxRange = rig.WorldLength * manualReach * 1.6f + Target.Radius;
             if (timer > reachTimeout || (Target.transform.position - transform.position).sqrMagnitude > maxRange * maxRange)
             {
                 Say("Промах!");

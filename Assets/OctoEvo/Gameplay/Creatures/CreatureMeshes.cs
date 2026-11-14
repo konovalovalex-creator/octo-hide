@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace OctoEvo
 {
-    public enum CreatureBody { Fish, Shrimp, Crab }
+    public enum CreatureBody { Fish, Shrimp, Crab, Flatfish }
 
     /// <summary>
     /// Процедурные меши существ (генерируются один раз и кэшируются).
@@ -21,6 +21,7 @@ namespace OctoEvo
             {
                 case CreatureBody.Shrimp: m = Shrimp(halfHeight, halfWidth); break;
                 case CreatureBody.Crab: m = Carapace(); break;
+                case CreatureBody.Flatfish: m = Flatfish(halfHeight, halfWidth); break;
                 default: m = Fish(halfHeight, halfWidth); break;
             }
             m.name = "Creature_" + key;
@@ -129,6 +130,30 @@ namespace OctoEvo
             // Грудные плавники
             for (int sgn = -1; sgn <= 1; sgn += 2)
                 b.Fin(new Vector3(w * 0.85f * sgn, -h * 0.2f, 0.2f), new Vector3(w * 1.9f * sgn, -h * 0.55f, 0.05f), new Vector3(w * 0.8f * sgn, -h * 0.35f, 0.08f));
+            return b.Build();
+        }
+
+        /// <summary>Камбала: плоское овальное тело, кайма плавников по краям, хвост в плоскости тела.</summary>
+        static Mesh Flatfish(float h, float w)
+        {
+            var b = new Builder();
+            Lathe(b, h, w, 20, 12, u =>
+            {
+                if (u < 0.1f) return 0.18f + u;
+                float k = (u - 0.1f) / 0.9f;
+                return Mathf.Max(0.06f, Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Pow(k, 0.8f)), 0.6f));
+            }, u => 0f, -0.4f, 0.5f);
+            // хвост — горизонтальный веер
+            b.Fin(new Vector3(-w * 0.2f, 0f, -0.38f), new Vector3(w * 0.2f, 0f, -0.38f), new Vector3(w * 0.55f, 0f, -0.6f));
+            b.Fin(new Vector3(-w * 0.2f, 0f, -0.38f), new Vector3(w * 0.55f, 0f, -0.6f), new Vector3(-w * 0.55f, 0f, -0.6f));
+            // кайма плавников вдоль боков
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+                for (int i = 0; i < 6; i++)
+                {
+                    float z0 = Mathf.Lerp(-0.3f, 0.3f, i / 6f), z1 = Mathf.Lerp(-0.3f, 0.3f, (i + 1) / 6f);
+                    float e0 = Mathf.Sin(Mathf.PI * (i / 6f * 0.8f + 0.1f)), e1 = Mathf.Sin(Mathf.PI * ((i + 1) / 6f * 0.8f + 0.1f));
+                    b.Fin(new Vector3(w * 0.85f * e0 * sgn, 0f, z0), new Vector3(w * 0.85f * e1 * sgn, 0f, z1), new Vector3(w * 1.3f * (e0 + e1) * 0.5f * sgn, 0f, (z0 + z1) * 0.5f));
+                }
             return b.Build();
         }
 

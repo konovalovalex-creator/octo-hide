@@ -23,11 +23,12 @@ namespace OctoEvo
         public Vector2 areaSize = new Vector2(90f, 90f);
 
         [Header("Численность")]
-        public int maxCreaturesPC = 60;
-        public int maxCreaturesMobile = 32;
-        public float spawnMinDistance = 4f;
-        public float spawnMaxDistance = 20f;
-        public float despawnDistance = 30f;
+        public int maxCreaturesPC = 120;
+        public int maxCreaturesMobile = 55;
+        [Tooltip("Дистанции для осьминога 10 см; растут вместе с ним")]
+        public float spawnMinDistance = 0.8f;
+        public float spawnMaxDistance = 6f;
+        public float despawnDistance = 10f;
         public float tickInterval = 0.4f;
 
         public OctopusMotor Player => player;
@@ -42,7 +43,7 @@ namespace OctoEvo
 
         int MaxCreatures => UnderwaterEnvironment.IsLowQuality ? maxCreaturesMobile : maxCreaturesPC;
         /// <summary>Чем больше осьминог, тем шире «пузырь» живого мира вокруг него.</summary>
-        float RangeScale => Mathf.Clamp(Mathf.Sqrt(PlayerLength / 0.1f), 1f, 3f);
+        float RangeScale => Mathf.Clamp(Mathf.Sqrt(PlayerLength / 0.1f), 1f, 6f);
 
         void Start()
         {
@@ -67,7 +68,7 @@ namespace OctoEvo
                 if ((c.transform.position - p).sqrMagnitude > despawn * despawn) Despawn(c);
             }
 
-            for (int n = 0; n < 3 && owned.Count < MaxCreatures; n++) TrySpawnGroup(false);
+            for (int n = 0; n < 6 && owned.Count < MaxCreatures; n++) TrySpawnGroup(false);
         }
 
         public Vector3 ClampToArea(Vector3 p)
@@ -161,8 +162,8 @@ namespace OctoEvo
                 switch (def.habitat)
                 {
                     case CreatureHabitat.Bottom: c.y = gy; break;
-                    case CreatureHabitat.NearBottom: c.y = gy + Random.Range(0.2f, 1.2f); break;
-                    default: c.y = Mathf.Lerp(gy + 1f, surface - 0.5f, Random.Range(0.1f, 0.9f)); break;
+                    case CreatureHabitat.NearBottom: c.y = gy + Random.Range(def.hoverHeight.x, def.hoverHeight.y); break;
+                    default: c.y = Mathf.Lerp(gy + 0.4f, Mathf.Min(surface - 0.5f, gy + 2f + 4f * rs), Random.value * Random.value); break;
                 }
                 c.y = Mathf.Min(c.y, surface - Mathf.Max(0.3f, def.minDepth));
                 if (c.y < gy) continue;

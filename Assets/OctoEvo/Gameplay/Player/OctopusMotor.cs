@@ -66,7 +66,7 @@ namespace OctoEvo
         /// <summary>Текущий масштаб осьминога (1 = модель в исходном размере).</summary>
         public float Scale => transform.lossyScale.x;
         /// <summary>Скорости растут медленнее размера: большой плывёт быстрее, но «тяжелее».</summary>
-        public float SpeedScale => Mathf.Sqrt(Mathf.Max(0.01f, Scale));
+        public float SpeedScale => Mathf.Pow(Mathf.Max(0.01f, Scale), 0.7f);
 
         /// <summary>Внешние системы (захват крупной добычи и т.п.) могут временно замедлить осьминога.</summary>
         public float externalSpeedMultiplier = 1f;
@@ -76,6 +76,14 @@ namespace OctoEvo
         void OnDisable() => All.Remove(this);
 
         public void SetPose(OctopusPose pose) => Pose = pose;
+
+        /// <summary>Бросок к добыче: мгновенно разгоняет в заданную сторону и отрывает от поверхности.</summary>
+        public void Lunge(Vector3 velocity)
+        {
+            detachUntil = Time.time + 0.35f;
+            IsGrounded = false;
+            rb.linearVelocity = velocity;
+        }
 
         /// <summary>Рывок по запросу других систем (чернила и т.п.).</summary>
         public void RequestJet(float multiplier = 1f, bool ignoreCooldown = false)

@@ -44,6 +44,7 @@ namespace OctoEvo
         Vector3 fleeFrom;
         float struggle;
         float nextWhoosh;
+        float restUntil;
 
         static readonly int IdBase = Shader.PropertyToID("_BaseColor");
         static readonly int IdBelly = Shader.PropertyToID("_BellyColor");
@@ -73,6 +74,7 @@ namespace OctoEvo
             Velocity = rotation * Vector3.forward * def.cruiseSpeed * length * 0.5f;
             Current = State.Wander;
             struggle = 0f;
+            restUntil = 0f;
             groundY = float.MinValue;
             nextGroundProbe = 0f;
             nextDecision = 0f;
@@ -90,7 +92,8 @@ namespace OctoEvo
             else
             {
                 vis = def.body == CreatureBody.Crab ? length * 2f : length;
-                visual.localPosition = def.body == CreatureBody.Crab ? new Vector3(0f, vis * 0.1f, 0f) : Vector3.zero;
+                visual.localPosition = def.body == CreatureBody.Crab ? new Vector3(0f, vis * 0.1f, 0f)
+                    : (def.habitat == CreatureHabitat.Bottom ? new Vector3(0f, vis * def.halfHeight * 0.8f, 0f) : Vector3.zero);
             }
             visual.localScale = Vector3.one * vis;
 
@@ -214,9 +217,19 @@ namespace OctoEvo
             {
                 mpb.SetFloat(IdHalfHeight, def.halfHeight);
                 float eyeZ = def.body == CreatureBody.Shrimp ? 0.36f : 0.37f;
-                mpb.SetVector(IdEyePos, new Vector4(def.halfWidth * 0.75f, def.halfHeight * 0.25f, eyeZ, 0f));
-                mpb.SetFloat(IdEyeRadius, def.halfHeight * 0.22f);
-                mpb.SetFloat(IdAmp, swimAmp);
+                if (def.body == CreatureBody.Flatfish)
+                {
+                    // оба глаза сверху
+                    mpb.SetVector(IdEyePos, new Vector4(def.halfWidth * 0.22f, def.halfHeight * 0.75f, 0.33f, 0f));
+                    mpb.SetFloat(IdEyeRadius, 0.022f);
+                    mpb.SetFloat(IdAmp, 0f);
+                }
+                else
+                {
+                    mpb.SetVector(IdEyePos, new Vector4(def.halfWidth * 0.75f, def.halfHeight * 0.25f, eyeZ, 0f));
+                    mpb.SetFloat(IdEyeRadius, def.halfHeight * 0.22f);
+                    mpb.SetFloat(IdAmp, swimAmp);
+                }
             }
             for (int i = 0; i < renderers.Length; i++)
             {
@@ -314,11 +327,11 @@ namespace OctoEvo
 
             if (threatened && !InkCloud.Contains(playerPos))
             {
+                // Дистанция испуга — в длинах осьминога: на виду ~8 длин, замаскированного и неподвижного
+                // подпускают почти вплотную (ближе броска). Беспечные (улитки) почти не реагируют.
                 float c = Director.PlayerConspicuity;
-                float notice = Def.noticeDistance
-                               * Mathf.Lerp(0.12f, 1.2f, c)
-                               * Mathf.Lerp(0.6f, 1.4f, Def.wariness)
-                               * Mathf.Clamp(Mathf.Sqrt(playerLen / 0.15f), 0.6f, 3f);
+                float notice = playerLen * Mathf.Lerp(0.7f, 8f, c) * Mathf.Lerp(0.15f, 1.4f, Def.wariness);
+                notice = Mathf.Min(notice, Def.noticeDistance * 4f);
                 float d = Vector3.Distance(transform.position, playerPos);
                 if (d < notice)
                 {
@@ -346,6 +359,7 @@ namespace OctoEvo
         float TargetSpeed()
         {
             float bl = Length;
+            if (Current == State.Wander && Time.time < restUntil) return 0f;
             switch (Current)
             {
                 case State.Flee: return Mathf.Min(Def.fleeSpeed * bl, Def.maxSpeed);
@@ -424,12 +438,17 @@ namespace OctoEvo
             switch (Def.habitat)
             {
                 case CreatureHabitat.Bottom: t.y = gy; break;
-                case CreatureHabitat.NearBottom: t.y = Mathf.Min(top, gy + Random.Range(0.2f, 1.2f) * Mathf.Max(1f, Length / 0.2f)); break;
-                default: t.y = Mathf.Lerp(Mathf.Min(top, gy + 1f), top, Random.value); break;
+                case CreatureHabitat.NearBottom: t.y = Mathf.Min(top, gy + Random.Range(Def.hoverHeight.x, Def.hoverHeight.y) * Mathf.Max(1f, Length / 0.2f)); break;
+                default: t.y = Mathf.Lerp(Mathf.Min(top, gy + 0.4f), top, Random.value * Random.value); break;
             }
             t.y = Mathf.Min(t.y, SurfaceY - Def.minDepth);
             wanderTarget = t;
             nextDecision = Time.time + Random.Range(3f, 8f);
+            if (Def.restful > 0f && Random.value < Def.restful)
+            {
+                restUntil = Time.time + Random.Range(4f, 14f);
+                nextDecision = restUntil + Random.Range(2f, 5f);
+            }
         }
 
         static float SurfaceY => UnderwaterEnvironment.Instance != null ? UnderwaterEnvironment.Instance.surfaceY : 10f;
@@ -509,8 +528,13 @@ namespace OctoEvo
                 // Краб ходит боком
                 Vector3 move = Vector3.ProjectOnPlane(v, groundNormal);
                 if (move.sqrMagnitude < 1e-6f) return;
-                Vector3 fwd = Vector3.Cross(move.normalized, groundNormal);
-                if (Current == State.Flee && Vector3.Dot(fwd, fleeFrom - transform.position) < 0f) fwd = -fwd; // клешнями к угрозе
+                Vector3 fwd;
+                if (Def.body == CreatureBody.Crab)
+                {
+                    fwd = Vector3.Cross(move.normalized, groundNormal);
+                    if (Current == State.Flee && Vector3.Dot(fwd, fleeFrom - transform.position) < 0f) fwd = -fwd; // клешнями к угрозе
+                }
+                else fwd = move.normalized; // улитки и камбалы ползут головой вперёд
                 target = Quaternion.LookRotation(fwd, groundNormal);
             }
             else

@@ -34,7 +34,7 @@ namespace OctoEvo
         public float reach = 0.85f;
         public float stepDistance = 0.45f;
         public float stepDuration = 0.18f;
-        public float stepHeight = 0.18f;
+        public float stepHeight = 0.05f;
 
         [Header("Физика")]
         public float gravity = 1.5f;
@@ -231,7 +231,7 @@ namespace OctoEvo
                 case OctopusPose.Kelp:     return new PoseCfg(TentacleMode.Plant, 0.45f * S, 0.05f * S, 0.02f * S); // щупальца — «корни» у основания стебля
                 case OctopusPose.Starfish: return new PoseCfg(TentacleMode.Plant, length * 0.92f * S, 0.02f * S, 0.005f * S);
                 case OctopusPose.Snake:    return new PoseCfg(TentacleMode.Trail, length * 0.9f * S, 0.03f * S, 0.02f * S);
-                default:                   return new PoseCfg(TentacleMode.Plant, reach * S, 0.15f * S, 0.03f * S);
+                default:                   return new PoseCfg(TentacleMode.Plant, reach * S, 0.05f * S, 0.03f * S);
             }
         }
 
@@ -274,7 +274,14 @@ namespace OctoEvo
                     }
                     else
                     {
-                        guess = rootPos + outDir * cfg.reach + root.forward * controller.NormalizedSpeed * 0.25f * S;
+                        // Осьминог не «шагает» как паук: в движении передние руки поджаты и подтягивают,
+                        // задние вытянуты и волочатся следом. Поэтому точки опоры смещаем НАЗАД по ходу.
+                        Vector3 vel = Vector3.ProjectOnPlane(controller.Velocity, up);
+                        float sp = Mathf.Clamp01(controller.NormalizedSpeed);
+                        Vector3 velDir = vel.sqrMagnitude > 1e-6f ? vel.normalized : Vector3.zero;
+                        float ahead = Vector3.Dot(outDir, velDir);
+                        float r = cfg.reach * (1f - 0.4f * Mathf.Max(0f, ahead) * sp);
+                        guess = rootPos + outDir * r - velDir * cfg.reach * 0.3f * sp;
                     }
                     Vector3 castFrom = guess + up * (0.6f * S + Mathf.Max(0f, lift));
                     if (Physics.Raycast(castFrom, -up, out RaycastHit hit, 1.6f * S + Mathf.Max(0f, lift), surfaceMask, QueryTriggerInteraction.Ignore)
@@ -338,7 +345,8 @@ namespace OctoEvo
                     }
                     if (tc.stepT < 1f)
                     {
-                        tc.stepT = Mathf.Min(1f, tc.stepT + dt / stepDuration);
+                        // на ходу щупальца перехватываются быстрее
+                        tc.stepT = Mathf.Min(1f, tc.stepT + dt / (stepDuration * Mathf.Lerp(1.3f, 0.7f, Mathf.Clamp01(controller.NormalizedSpeed))));
                         if (tc.stepT >= 1f && controller.isLocalPlayer)
                             AudioDirector.Play(Sfx.Crawl, tc.foot, 0.35f, 1.3f - Mathf.Clamp01(S) * 0.4f);
                         float e = tc.stepT * tc.stepT * (3f - 2f * tc.stepT);
@@ -368,6 +376,8 @@ namespace OctoEvo
             Vector3 tip = tc.foot;
             Vector3 mid = (rootPos + tip) * 0.5f + up * cfg.arch;
             if (cfg.mode == TentacleMode.Up) mid += outDir * 0.15f * S;
+            // лежащее щупальце изгибается буквой S, а не стоит дугой
+            else if (cfg.mode == TentacleMode.Plant) mid += side * (tc.phase > 0.25f ? 1f : -1f) * 0.1f * S * Mathf.Clamp01(Vector3.Distance(rootPos, tip) / Mathf.Max(1e-4f, length * S));
 
             for (int i = 1; i < n; i++)
             {

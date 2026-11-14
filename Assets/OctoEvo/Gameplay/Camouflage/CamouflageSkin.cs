@@ -150,14 +150,18 @@ namespace OctoEvo
             if (Energy < sampleCost) { Say("Мало пигмента"); return false; }
 
             Collider col = controller != null ? controller.SurfaceCollider : null;
+            Vector3 normal = controller != null ? controller.SurfaceNormal : Vector3.up;
             if (col == null)
             {
                 // В толще воды — ищем поверхность под собой
                 if (Physics.Raycast(transform.position, -transform.up, out RaycastHit hit, sampleRange * transform.lossyScale.x, ~0, QueryTriggerInteraction.Ignore)
                     && hit.collider.attachedRigidbody == null)
+                {
                     col = hit.collider;
+                    normal = hit.normal;
+                }
             }
-            if (col == null || !CamoSurface.TryGetState(col, transform.localToWorldMatrix, out CamoState s))
+            if (col == null || !CamoSurface.TryGetState(col, transform.localToWorldMatrix, normal, out CamoState s))
             {
                 Say("Нечего копировать");
                 return false;
@@ -238,6 +242,10 @@ namespace OctoEvo
             mat.SetColor(AvgB, stateB.average);
             mat.SetMatrix(CapB, DeltaMatrix(stateB));
 
+            mat.SetTexture(Tex2A, stateA.pattern2 != null ? stateA.pattern2 : Texture2D.whiteTexture);
+            mat.SetTexture(Tex2B, stateB.pattern2 != null ? stateB.pattern2 : Texture2D.whiteTexture);
+            mat.SetVector(LayerA, new Vector4(stateA.layer.x, stateA.layer.y, stateA.layer.z, stateA.pattern2 != null ? stateA.scale2 : 0f));
+            mat.SetVector(LayerB, new Vector4(stateB.layer.x, stateB.layer.y, stateB.layer.z, stateB.pattern2 != null ? stateB.scale2 : 0f));
             mat.SetFloat(BlendId, blend);
             mat.SetFloat(NatAId, stateA.natural ? 1f : 0f);
             mat.SetFloat(NatBId, stateB.natural ? 1f : 0f);
@@ -252,6 +260,8 @@ namespace OctoEvo
             mat.SetFloat(RippleStrengthId, RippleAmount > 0f ? rippleStrength : 0f);
         }
 
+        static readonly int Tex2A = Shader.PropertyToID("_Tex2A"), Tex2B = Shader.PropertyToID("_Tex2B"),
+            LayerA = Shader.PropertyToID("_LayerA"), LayerB = Shader.PropertyToID("_LayerB");
         static readonly int NatAId = Shader.PropertyToID("_NaturalA");
         static readonly int NatBId = Shader.PropertyToID("_NaturalB");
         static readonly int PapFreqId = Shader.PropertyToID("_PapillaeFreq");

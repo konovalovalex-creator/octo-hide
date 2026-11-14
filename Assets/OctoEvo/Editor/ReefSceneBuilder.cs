@@ -276,6 +276,17 @@ namespace OctoEvo.EditorTools
                 hud.ink = ink;
                 hud.spawner = spawner;
 
+                // ---------- Средние цвета поверхностей для маскировки (оба слоя материала)
+                var avgCache = new System.Collections.Generic.Dictionary<Texture, Color>();
+                foreach (var cs in Object.FindObjectsByType<CamoSurface>(FindObjectsSortMode.None))
+                {
+                    var r = cs.GetComponentInChildren<Renderer>();
+                    var m = r != null ? r.sharedMaterial : null;
+                    if (m == null) continue;
+                    if (cs.bakedAverage.a <= 0f && m.HasProperty("_BaseMap")) cs.bakedAverage = CachedAverage(avgCache, m.GetTexture("_BaseMap"));
+                    if (m.HasProperty("_Base2Map") && m.GetFloat("_Layer2") > 0.5f) cs.bakedAverage2 = CachedAverage(avgCache, m.GetTexture("_Base2Map"));
+                }
+
                 ProceduralAssets.EnsureFolder("Assets/OctoEvo/Scenes");
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -504,6 +515,13 @@ namespace OctoEvo.EditorTools
             c.colorOnly = true;
             c.papillae = papillae;
             c.bakedAverage = ArtLibrary.AverageColor(mat.GetTexture("_BaseMap"));
+        }
+
+        static Color CachedAverage(System.Collections.Generic.Dictionary<Texture, Color> cache, Texture t)
+        {
+            if (t == null) return new Color(0, 0, 0, 0);
+            if (!cache.TryGetValue(t, out Color c)) cache[t] = c = ArtLibrary.AverageColor(t);
+            return c;
         }
 
         static void RockCamo(GameObject go, Color avg)

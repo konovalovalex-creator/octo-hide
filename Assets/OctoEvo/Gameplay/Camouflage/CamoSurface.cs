@@ -20,6 +20,19 @@ namespace OctoEvo
         public Color bakedAverage = new Color(0f, 0f, 0f, 0f);
         [Tooltip("Материал с UV-развёрткой (кораллы, губки): копировать только цвет, узор — пятнистый")]
         public bool colorOnly = false;
+        [Tooltip("Средний цвет второго слоя материала (мох, гравий). Альфа 0 — не задан.")]
+        public Color bakedAverage2 = new Color(0f, 0f, 0f, 0f);
+
+        Texture pattern2;
+        float scale2 = 1f, noiseScale, blendAmount, blendUp, sharpness = 6f;
+        bool hasLayer2;
+        static readonly int Layer2Id = Shader.PropertyToID("_Layer2");
+        static readonly int Base2Id = Shader.PropertyToID("_Base2Map");
+        static readonly int Scale2Id = Shader.PropertyToID("_Scale2");
+        static readonly int NoiseScaleId = Shader.PropertyToID("_BlendNoiseScale");
+        static readonly int AmountId = Shader.PropertyToID("_BlendAmount");
+        static readonly int UpId = Shader.PropertyToID("_BlendUp");
+        static readonly int SharpId = Shader.PropertyToID("_BlendSharpness");
 
         public Texture Pattern { get; private set; }
         public Color Tint { get; private set; } = Color.white;
@@ -50,9 +63,43 @@ namespace OctoEvo
             Scale = scale;
             Average = (bakedAverage.a > 0f ? bakedAverage : AverageOf(tex)) * tint;
             Average = new Color(Average.r, Average.g, Average.b, 1f);
+
+            Material m = targetRenderer.sharedMaterial;
+            hasLayer2 = m != null && m.HasProperty(Layer2Id) && m.GetFloat(Layer2Id) > 0.5f && m.GetTexture(Base2Id) != null;
+            if (hasLayer2)
+            {
+                pattern2 = m.GetTexture(Base2Id);
+                scale2 = m.GetFloat(Scale2Id);
+                noiseScale = m.GetFloat(NoiseScaleId);
+                blendAmount = m.GetFloat(AmountId);
+                blendUp = m.GetFloat(UpId);
+                sharpness = m.GetFloat(SharpId);
+            }
         }
 
-        public CamoState ToState(Matrix4x4 capturePose)
+        public CamoState ToState(Matrix4x4 capturePose) => ToState(capturePose, Vector3.up);
+
+        /// <param name="surfaceNormal">Нормаль поверхности под осьминогом: мох растёт сверху, на стене его может не быть.</param>
+        public CamoState ToState(Matrix4x4 capturePose, Vector3 surfaceNormal)
+        {
+            var s = BaseState(capturePose);
+            if (hasLayer2 && !colorOnly)
+            {
+                float bias = (blendAmount - 0.5f) + (surfaceNormal.y - 0.5f) * blendUp;
+                s.pattern2 = pattern2;
+                s.scale2 = scale2;
+                s.layer = new Vector4(noiseScale, bias, sharpness, 1f);
+                if (bakedAverage2.a > 0f)
+                {
+                    float cover = Mathf.Clamp01(0.5f + bias * 2f);
+                    Color a2 = bakedAverage2 * Tint;
+                    s.average = Color.Lerp(s.average, new Color(a2.r, a2.g, a2.b, 1f), cover);
+                }
+            }
+            return s;
+        }
+
+        CamoState BaseState(Matrix4x4 capturePose)
         {
             if (colorOnly)
                 return new CamoState
@@ -78,14 +125,17 @@ namespace OctoEvo
         }
 
         /// <summary>Состояние маскировки для любого коллайдера — с CamoSurface или без.</summary>
-        public static bool TryGetState(Collider col, Matrix4x4 capturePose, out CamoState state)
+        public static bool TryGetState(Collider col, Matrix4x4 capturePose, out CamoState state) =>
+            TryGetState(col, capturePose, Vector3.up, out state);
+
+        public static bool TryGetState(Collider col, Matrix4x4 capturePose, Vector3 surfaceNormal, out CamoState state)
         {
             state = default;
             if (col == null) return false;
             var surf = col.GetComponentInParent<CamoSurface>();
             if (surf != null)
             {
-                state = surf.ToState(capturePose);
+                state = surf.ToState(capturePose, surfaceNormal);
                 return true;
             }
             var r = col.GetComponentInParent<Renderer>();

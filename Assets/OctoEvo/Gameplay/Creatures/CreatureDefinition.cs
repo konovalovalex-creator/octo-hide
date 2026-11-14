@@ -16,6 +16,7 @@ namespace OctoEvo
     [CreateAssetMenu(menuName = "OctoEvo/Creature Definition", fileName = "Creature")]
     public class CreatureDefinition : ScriptableObject
     {
+        [HideInInspector] public int presetVersion;
         public string displayName = "Рыбка";
         public CreatureBody body = CreatureBody.Fish;
         public CreatureHabitat habitat = CreatureHabitat.MidWater;
@@ -53,6 +54,11 @@ namespace OctoEvo
         [Tooltip("Ограничение скорости в м/с, чтобы крупные не носились как ракеты")]
         public float maxSpeed = 3f;
         public float turnRate = 3f;
+
+        [Tooltip("Высота над дном для NearBottom (мин, макс), м")]
+        public Vector2 hoverHeight = new Vector2(0.2f, 1.2f);
+        [Tooltip("Доля времени, когда существо просто лежит/сидит на месте (камбала, улитка)")]
+        [Range(0, 1)] public float restful = 0f;
 
         [Header("Стая")]
         public bool schooling = false;

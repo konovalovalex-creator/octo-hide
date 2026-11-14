@@ -17,6 +17,9 @@ namespace OctoEvo
         public Matrix4x4 captureLocalToWorld; // поза осьминога в момент копирования
         public int sourceSurfaceId;    // 0 — ручная палитра
         public bool natural;           // естественный окрас модели (текстура из Tripo)
+        public Texture pattern2;       // второй слой поверхности (мох, гравий) — пятнами, как на самой поверхности
+        public float scale2;
+        public Vector4 layer;          // x — размер пятен (1/м), y — смещение покрытия, z — резкость, w — слой включён
 
         public bool IsFromSurface => sourceSurfaceId != 0;
     }

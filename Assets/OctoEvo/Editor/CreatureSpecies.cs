@@ -13,6 +13,8 @@ namespace OctoEvo.EditorTools
     public static class CreatureSpecies
     {
         public const string Dir = "Assets/OctoEvo/Data/Creatures";
+        /// <summary>Поднять, когда меняются стартовые настройки видов: существующие ассеты перезапишутся.</summary>
+        const int PresetVersion = 2;
 
         public static CreatureDefinition[] EnsureAll()
         {
@@ -29,7 +31,35 @@ namespace OctoEvo.EditorTools
                     d.smoothness = 0.7f; d.translucency = 0.55f;
                     d.cruiseSpeed = 1.2f; d.fleeSpeed = 14f; d.maxSpeed = 1f; d.turnRate = 4f;
                     d.schooling = true; d.groupSize = new Vector2Int(3, 6);
-                    d.noticeDistance = 0.5f; d.wariness = 0.6f; d.spawnWeight = 1.2f;
+                    d.noticeDistance = 0.5f; d.wariness = 0.5f; d.spawnWeight = 1.6f; d.hoverHeight = new Vector2(0.01f, 0.12f);
+                }),
+                Get("Snail", d =>
+                {
+                    d.displayName = "Морская улитка"; d.body = CreatureBody.Fish; d.habitat = CreatureHabitat.Bottom;
+                    d.minLength = 0.015f; d.maxLength = 0.05f; d.halfHeight = 0.3f; d.halfWidth = 0.3f;
+                    d.backColor = new Color(0.55f, 0.45f, 0.35f); d.bellyColor = new Color(0.8f, 0.72f, 0.6f);
+                    d.patternColor = new Color(0.3f, 0.22f, 0.15f); d.pattern = 2; d.patternScale = 5f;
+                    d.cruiseSpeed = 0.25f; d.fleeSpeed = 0.3f; d.maxSpeed = 0.03f; d.turnRate = 1f; d.restful = 0.6f;
+                    d.noticeDistance = 0.3f; d.wariness = 0f; d.spawnWeight = 2.2f;
+                }),
+                Get("SandCrab", d =>
+                {
+                    d.displayName = "Песчаный крабик"; d.body = CreatureBody.Crab; d.habitat = CreatureHabitat.Bottom;
+                    d.minLength = 0.02f; d.maxLength = 0.06f; d.halfHeight = 0.08f; d.halfWidth = 0.25f;
+                    d.backColor = new Color(0.75f, 0.66f, 0.5f); d.bellyColor = new Color(0.9f, 0.84f, 0.7f);
+                    d.patternColor = new Color(0.5f, 0.4f, 0.28f); d.pattern = 4; d.patternScale = 6f;
+                    d.cruiseSpeed = 1.5f; d.fleeSpeed = 7f; d.maxSpeed = 0.5f; d.turnRate = 4f; d.restful = 0.3f;
+                    d.schooling = false; d.groupSize = new Vector2Int(1, 1);
+                    d.noticeDistance = 0.6f; d.wariness = 0.45f; d.spawnWeight = 2.2f;
+                }),
+                Get("Flounder", d =>
+                {
+                    d.displayName = "Камбала"; d.body = CreatureBody.Flatfish; d.habitat = CreatureHabitat.Bottom;
+                    d.minLength = 0.06f; d.maxLength = 0.3f; d.halfHeight = 0.035f; d.halfWidth = 0.26f;
+                    d.backColor = new Color(0.74f, 0.68f, 0.56f); d.bellyColor = new Color(0.7f, 0.64f, 0.52f);
+                    d.patternColor = new Color(0.5f, 0.44f, 0.34f); d.pattern = 2; d.patternScale = 9f; d.smoothness = 0.25f;
+                    d.cruiseSpeed = 0.8f; d.fleeSpeed = 7f; d.maxSpeed = 1.6f; d.turnRate = 3f; d.restful = 0.8f;
+                    d.noticeDistance = 0.8f; d.wariness = 0.3f; d.spawnWeight = 1.6f;
                 }),
                 Get("Goby", d =>
                 {
@@ -38,7 +68,7 @@ namespace OctoEvo.EditorTools
                     d.backColor = new Color(0.62f, 0.56f, 0.42f); d.bellyColor = new Color(0.86f, 0.83f, 0.72f);
                     d.patternColor = new Color(0.3f, 0.25f, 0.18f); d.pattern = 2; d.patternScale = 7f;
                     d.cruiseSpeed = 1f; d.fleeSpeed = 10f; d.maxSpeed = 1.2f; d.turnRate = 4f;
-                    d.noticeDistance = 0.8f; d.wariness = 0.5f; d.spawnWeight = 1f;
+                    d.noticeDistance = 0.8f; d.wariness = 0.45f; d.spawnWeight = 1.6f; d.hoverHeight = new Vector2(0.005f, 0.05f); d.restful = 0.5f;
                 }),
                 Get("Chromis", d =>
                 {
@@ -57,7 +87,7 @@ namespace OctoEvo.EditorTools
                     d.backColor = new Color(0.62f, 0.3f, 0.18f); d.bellyColor = new Color(0.86f, 0.62f, 0.46f);
                     d.patternColor = new Color(0.35f, 0.15f, 0.1f); d.pattern = 4; d.patternScale = 5f; d.smoothness = 0.45f;
                     d.cruiseSpeed = 0.8f; d.fleeSpeed = 4f; d.maxSpeed = 0.8f; d.turnRate = 3f;
-                    d.noticeDistance = 0.9f; d.wariness = 0.6f; d.spawnWeight = 0.9f;
+                    d.noticeDistance = 0.9f; d.wariness = 0.5f; d.spawnWeight = 1.6f; d.restful = 0.3f;
                 }),
                 Get("SergeantMajor", d =>
                 {
@@ -111,6 +141,9 @@ namespace OctoEvo.EditorTools
             Attach(list, "Goby", "Goby", 1f, 0.05f);
             Attach(list, "Chromis", "Chromis", 1f, 0.05f);
             Attach(list, "Crab", "Crab", 1.6f, 0f);
+            Attach(list, "SandCrab", "Crab", 1.6f, 0f);
+            Attach(list, "Snail", "Seashell", 1f, 0f);
+            Attach(list, "Flounder", "Flounder", 1f, 0.02f);   // появится, когда будет модель
             Attach(list, "SergeantMajor", "SergeantMajor", 1f, 0.05f);
             Attach(list, "Wrasse", "Wrasse", 1f, 0.05f);
             Attach(list, "Grouper", "Grouper", 1f, 0.04f);
@@ -136,9 +169,17 @@ namespace OctoEvo.EditorTools
         {
             string path = $"{Dir}/{file}.asset";
             var existing = AssetDatabase.LoadAssetAtPath<CreatureDefinition>(path);
-            if (existing != null) return existing;
+            if (existing != null && existing.presetVersion >= PresetVersion) return existing;
+            if (existing != null)
+            {
+                setup(existing);
+                existing.presetVersion = PresetVersion;
+                EditorUtility.SetDirty(existing);
+                return existing;
+            }
             var d = ScriptableObject.CreateInstance<CreatureDefinition>();
             setup(d);
+            d.presetVersion = PresetVersion;
             AssetDatabase.CreateAsset(d, path);
             return d;
         }
