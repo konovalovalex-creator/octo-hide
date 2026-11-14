@@ -278,7 +278,7 @@ namespace OctoEvo.EditorTools
 
                 // ---------- Средние цвета поверхностей для маскировки (оба слоя материала)
                 var avgCache = new System.Collections.Generic.Dictionary<Texture, Color>();
-                foreach (var cs in Object.FindObjectsByType<CamoSurface>(FindObjectsSortMode.None))
+                foreach (var cs in Object.FindObjectsByType<CamoSurface>())
                 {
                     var r = cs.GetComponentInChildren<Renderer>();
                     var m = r != null ? r.sharedMaterial : null;

@@ -23,8 +23,8 @@ namespace OctoEvo
         public Vector2 areaSize = new Vector2(90f, 90f);
 
         [Header("Численность")]
-        public int maxCreaturesPC = 120;
-        public int maxCreaturesMobile = 55;
+        public int maxCreaturesPC = 160;
+        public int maxCreaturesMobile = 80;
         [Tooltip("Дистанции для осьминога 10 см; растут вместе с ним")]
         public float spawnMinDistance = 0.8f;
         public float spawnMaxDistance = 6f;
@@ -65,7 +65,9 @@ namespace OctoEvo
                 var c = owned[i];
                 if (c == null) { owned.RemoveAt(i); continue; }
                 if (c.Current == Creature.State.Grabbed) continue;
-                if ((c.transform.position - p).sqrMagnitude > despawn * despawn) Despawn(c);
+                // мелочь издалека всё равно не видна — держим её ближе
+                float limit = Mathf.Min(despawn, 2f + c.Length * 90f);
+                if ((c.transform.position - p).sqrMagnitude > limit * limit) Despawn(c);
             }
 
             for (int n = 0; n < 6 && owned.Count < MaxCreatures; n++) TrySpawnGroup(false);
@@ -153,7 +155,9 @@ namespace OctoEvo
 
             for (int attempt = 0; attempt < 8; attempt++)
             {
-                float dist = Random.Range(initial ? spawnMinDistance * 0.5f : spawnMinDistance, spawnMaxDistance) * rs;
+                float minD = (initial ? spawnMinDistance * 0.5f : spawnMinDistance) * rs;
+                float maxD = Mathf.Max(minD * 1.5f, Mathf.Min(spawnMaxDistance * rs, 1f + def.AverageLength * 50f));
+                float dist = Mathf.Lerp(minD, maxD, Mathf.Pow(Random.value, 1.5f));
                 Vector2 dir = Random.insideUnitCircle.normalized;
                 Vector3 c = ClampToArea(p + new Vector3(dir.x, 0f, dir.y) * dist);
                 float gy = GroundY(c);
@@ -172,7 +176,7 @@ namespace OctoEvo
                 if (def.habitat != CreatureHabitat.Bottom && Physics.CheckSphere(c, def.maxLength * 0.6f, ~0, QueryTriggerInteraction.Ignore)) continue;
 
                 // Не появляться на глазах у игрока вблизи
-                if (!initial && cam != null && dist < spawnMaxDistance * 0.6f * rs)
+                if (!initial && cam != null && dist < maxD * 0.5f)
                 {
                     Vector3 vp = cam.WorldToViewportPoint(c);
                     if (vp.z > 0f && vp.x > -0.1f && vp.x < 1.1f && vp.y > -0.1f && vp.y < 1.1f) continue;
