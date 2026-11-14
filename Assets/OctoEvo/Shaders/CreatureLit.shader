@@ -1,7 +1,8 @@
 // Морские существа (рыбы, креветки, крабы): окрас считается в координатах объекта,
 // поэтому узор едет вместе с рыбой. Плавательная волна по телу — в вершинном шейдере.
 // Меш: голова по +Z, длина 1 (z от -0.5 до 0.5), цвет вершины R = 1 тело / 0 плавник.
-// Индивидуальные цвета и фаза плавания задаются через MaterialPropertyBlock.
+// Индивидуальные цвета и фаза плавания задаются через MaterialPropertyBlock,
+// поэтому GPU instancing здесь выключен намеренно (с ним у всех особей общие свойства и теряется свет).
 Shader "OctoEvo/CreatureLit"
 {
     Properties
@@ -83,7 +84,6 @@ Shader "OctoEvo/CreatureLit"
             #pragma fragment frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
-            #pragma multi_compile_instancing
             #pragma shader_feature_local _TEXTURED
 
             struct Attributes
@@ -195,7 +195,6 @@ Shader "OctoEvo/CreatureLit"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_instancing
             float3 _LightDirection;
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; };
@@ -226,7 +225,6 @@ Shader "OctoEvo/CreatureLit"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_instancing
             struct Attributes { float4 positionOS : POSITION; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; };
             Varyings vert(Attributes v) { Varyings o; UNITY_SETUP_INSTANCE_ID(v); o.positionCS = TransformObjectToHClip(SwimDisplace(v.positionOS.xyz)); return o; }
@@ -243,7 +241,6 @@ Shader "OctoEvo/CreatureLit"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_instancing
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; float3 normalWS : TEXCOORD0; };
             Varyings vert(Attributes v)

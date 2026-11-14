@@ -81,7 +81,9 @@ namespace OctoEvo.EditorTools
                 var mSnow = SaveMat(new Material(particle), "MarineSnow");
                 mSnow.SetTexture("_BaseMap", dot);
                 var mSurface = SaveMat(new Material(surface), "WaterSurface");
-                var mCreature = SaveMat(new Material(creatureShader) { enableInstancing = true }, "Creature");
+                var mCreature = SaveMat(new Material(creatureShader), "Creature");
+                mCreature.enableInstancing = false;
+                EditorUtility.SetDirty(mCreature);
                 var mInk = SaveMat(new Material(particle), "Ink");
                 mInk.SetTexture("_BaseMap", dot);
                 mInk.SetColor("_BaseColor", Color.white);

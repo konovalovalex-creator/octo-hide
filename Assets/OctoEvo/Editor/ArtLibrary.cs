@@ -117,7 +117,7 @@ namespace OctoEvo.EditorTools
             if (n != null) m.SetTexture("_NormalMap", n);
             var r = ModelTex(name, "Roughness");
             if (r != null) m.SetTexture("_RoughnessMap", r);
-            m.enableInstancing = true;
+            m.enableInstancing = false;
             return Save(m, "Creature_" + name);
         }
 
