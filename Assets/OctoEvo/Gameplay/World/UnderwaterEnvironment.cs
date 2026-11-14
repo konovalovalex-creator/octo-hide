@@ -15,7 +15,7 @@ namespace OctoEvo
 
         [Header("Вода")]
         [Tooltip("Цвет рассеянного света в воде у поверхности")]
-        public Color waterColor = new Color(0.06f, 0.33f, 0.42f);
+        public Color waterColor = new Color(0.1f, 0.45f, 0.55f);
         [Tooltip("Поглощение на метр по каналам: красный гаснет первым")]
         public Vector3 absorption = new Vector3(0.07f, 0.028f, 0.018f);
         [Tooltip("Мутность: рассеяние на метр")]

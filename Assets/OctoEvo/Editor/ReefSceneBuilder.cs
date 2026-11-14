@@ -70,8 +70,8 @@ namespace OctoEvo.EditorTools
                 // ---------- Свет
                 RenderSettings.skybox = null;
                 RenderSettings.ambientMode = AmbientMode.Trilight;
-                RenderSettings.ambientSkyColor = new Color(0.3f, 0.5f, 0.6f);
-                RenderSettings.ambientEquatorColor = new Color(0.13f, 0.28f, 0.34f);
+                RenderSettings.ambientSkyColor = new Color(0.42f, 0.62f, 0.72f);
+                RenderSettings.ambientEquatorColor = new Color(0.2f, 0.36f, 0.42f);
                 RenderSettings.ambientGroundColor = new Color(0.05f, 0.09f, 0.11f);
                 RenderSettings.fog = false;
 
@@ -79,7 +79,7 @@ namespace OctoEvo.EditorTools
                 var sun = sunGo.AddComponent<Light>();
                 sun.type = LightType.Directional;
                 sun.color = new Color(1f, 0.97f, 0.9f);
-                sun.intensity = 2.2f;
+                sun.intensity = 3f;
                 sun.shadows = LightShadows.Soft;
                 sun.shadowStrength = 0.85f;
                 sunGo.transform.rotation = Quaternion.Euler(62f, -35f, 0f);
