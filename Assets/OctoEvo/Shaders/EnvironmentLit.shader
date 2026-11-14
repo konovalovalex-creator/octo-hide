@@ -11,6 +11,16 @@ Shader "OctoEvo/EnvironmentLit"
         _Scale ("Texture Scale (1/м)", Float) = 0.5
         _Smoothness ("Smoothness", Range(0, 1)) = 0.25
         _Occlusion ("Cavity Occlusion", Range(0, 1)) = 0.5
+
+        [Header(Second layer (algae, gravel, moss))]
+        [Toggle(_LAYER2)] _Layer2 ("Enable Layer 2", Float) = 0
+        _Base2Map ("Albedo 2", 2D) = "white" {}
+        [Normal] _Normal2Map ("Normal Map 2", 2D) = "bump" {}
+        _Scale2 ("Texture Scale 2 (1/м)", Float) = 0.5
+        _BlendNoiseScale ("Patch Size (1/м)", Float) = 0.15
+        _BlendAmount ("Coverage", Range(0, 1)) = 0.4
+        _BlendUp ("Prefer Top-Facing", Range(0, 1)) = 0
+        _BlendSharpness ("Edge Sharpness", Range(1, 20)) = 6
     }
 
     SubShader
@@ -25,6 +35,8 @@ Shader "OctoEvo/EnvironmentLit"
 
         TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
         TEXTURE2D(_NormalMap); SAMPLER(sampler_NormalMap);
+        TEXTURE2D(_Base2Map); SAMPLER(sampler_Base2Map);
+        TEXTURE2D(_Normal2Map); SAMPLER(sampler_Normal2Map);
 
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
@@ -33,6 +45,11 @@ Shader "OctoEvo/EnvironmentLit"
             float _Scale;
             half _Smoothness;
             half _Occlusion;
+            float _Scale2;
+            float _BlendNoiseScale;
+            half _BlendAmount;
+            half _BlendUp;
+            half _BlendSharpness;
         CBUFFER_END
         ENDHLSL
 
@@ -47,6 +64,7 @@ Shader "OctoEvo/EnvironmentLit"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_instancing
+            #pragma shader_feature_local _LAYER2
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings
@@ -76,6 +94,20 @@ Shader "OctoEvo/EnvironmentLit"
                 half4 albedoTex = OctoTriplanar(TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap), i.positionWS, n, _Scale);
                 half3 albedo = albedoTex.rgb * _BaseColor.rgb;
                 float3 nWS = UW_TriplanarNormal(TEXTURE2D_ARGS(_NormalMap, sampler_NormalMap), i.positionWS, n, _Scale, _NormalStrength);
+            #if defined(_LAYER2)
+                // Пятна второго слоя: шум в мире + (по желанию) только сверху — мох и водоросли растут к свету
+                float patch = OctoFbm(i.positionWS * _BlendNoiseScale);
+                float m = patch + (_BlendAmount - 0.5) + (n.y - 0.5) * _BlendUp;
+                m = saturate((m - 0.5) * _BlendSharpness + 0.5);
+                if (m > 0.001)
+                {
+                    half4 tex2 = OctoTriplanar(TEXTURE2D_ARGS(_Base2Map, sampler_Base2Map), i.positionWS, n, _Scale2);
+                    float3 n2 = UW_TriplanarNormal(TEXTURE2D_ARGS(_Normal2Map, sampler_Normal2Map), i.positionWS, n, _Scale2, _NormalStrength);
+                    albedoTex = lerp(albedoTex, tex2, m);
+                    albedo = albedoTex.rgb * _BaseColor.rgb;
+                    nWS = normalize(lerp(nWS, n2, m));
+                }
+            #endif
                 // тёмные участки текстуры — впадины: чуть приглушаем амбиент
                 half occlusion = lerp(1.0, saturate(Luminance(albedoTex.rgb) * 1.6), _Occlusion);
                 half3 col = UW_Shade(albedo, i.positionWS, nWS, i.positionCS, _Smoothness, occlusion);

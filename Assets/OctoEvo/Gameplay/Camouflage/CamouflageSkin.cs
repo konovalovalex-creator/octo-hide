@@ -104,7 +104,7 @@ namespace OctoEvo
             basePapHeight = mat.HasProperty(PapHeightId) ? mat.GetFloat(PapHeightId) : 0.035f;
             foreach (var r in skinRenderers) if (r != null) r.sharedMaterial = mat;
 
-            stateB = PaletteState(defaultColor);
+            stateB = NaturalState();
             stateA = stateB;
             blend = 1f;
             papillae = papillaeTarget = 0.25f;
@@ -125,7 +125,7 @@ namespace OctoEvo
             {
                 if (OctoInput.SamplePressed) TrySampleSurface();
                 if (OctoInput.CyclePalettePressed) TryPalette();
-                if (OctoInput.ResetSkinPressed) StartTransition(PaletteState(defaultColor), 0f, "Обычный окрас");
+                if (OctoInput.ResetSkinPressed) StartTransition(NaturalState(), 0f, "Обычный окрас");
 
                 if (OctoInput.PapillaeUp) papillaeTarget = Mathf.Clamp01(papillaeTarget + papillaeSpeed * Time.deltaTime);
                 if (OctoInput.PapillaeDown) papillaeTarget = Mathf.Clamp01(papillaeTarget - papillaeSpeed * Time.deltaTime);
@@ -177,12 +177,27 @@ namespace OctoEvo
 
         void StartTransition(CamoState target, float cost, string message)
         {
+            AudioDirector.Play(Sfx.Bubble, transform.position, 0.4f, 0.9f);
             if (InTransition) return;
             Energy -= cost;
             stateA = stateB;
             stateB = target;
             blend = 0f;
             Say(message);
+        }
+
+        [Tooltip("Средний цвет текстуры модели (заполняет сборщик сцены). Альфа 0 — модели нет, обычный окрас = defaultColor")]
+        public Color naturalAverage = new Color(0f, 0f, 0f, 0f);
+
+        CamoState NaturalState()
+        {
+            var s = PaletteState(defaultColor);
+            if (naturalAverage.a > 0f)
+            {
+                s.natural = true;
+                s.average = new Color(naturalAverage.r, naturalAverage.g, naturalAverage.b, 1f);
+            }
+            return s;
         }
 
         CamoState PaletteState(Color c)
@@ -224,6 +239,8 @@ namespace OctoEvo
             mat.SetMatrix(CapB, DeltaMatrix(stateB));
 
             mat.SetFloat(BlendId, blend);
+            mat.SetFloat(NatAId, stateA.natural ? 1f : 0f);
+            mat.SetFloat(NatBId, stateB.natural ? 1f : 0f);
             mat.SetFloat(PapId, papillae);
             // Пупырышки растут вместе с осьминогом, а не остаются «метровыми»
             float sc = Mathf.Max(0.01f, transform.lossyScale.x);
@@ -235,6 +252,8 @@ namespace OctoEvo
             mat.SetFloat(RippleStrengthId, RippleAmount > 0f ? rippleStrength : 0f);
         }
 
+        static readonly int NatAId = Shader.PropertyToID("_NaturalA");
+        static readonly int NatBId = Shader.PropertyToID("_NaturalB");
         static readonly int PapFreqId = Shader.PropertyToID("_PapillaeFreq");
         static readonly int PapHeightId = Shader.PropertyToID("_PapillaeHeight");
         float basePapFreq = 14f, basePapHeight = 0.035f;

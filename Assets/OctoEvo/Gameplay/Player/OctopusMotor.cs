@@ -199,7 +199,12 @@ namespace OctoEvo
                 if (Pose != OctopusPose.Normal) Pose = OctopusPose.Normal;
             }
 
+            bool wasGrounded = IsGrounded;
+            Vector3 vBefore = rb.linearVelocity;
             ProbeSurface(s);
+            // Приземление после плавания — шлепок о дно
+            if (!wasGrounded && IsGrounded && vBefore.magnitude > 0.8f * SpeedScale)
+                AudioDirector.Play(Sfx.Land, transform.position, Mathf.Clamp01(vBefore.magnitude / (jetImpulse * SpeedScale)) * 0.8f);
 
             Vector3 v = rb.linearVelocity;
 
@@ -212,6 +217,7 @@ namespace OctoEvo
                 Vector3 dir = moveSwim.sqrMagnitude > 0.01f ? moveSwim.normalized : cam.forward;
                 if (IsGrounded) dir = (dir + SurfaceNormal * 0.6f).normalized;
                 rb.AddForce(dir * jetImpulse * jetMultiplier * SpeedScale, ForceMode.VelocityChange);
+                AudioDirector.Play(Sfx.Jet, transform.position, Mathf.Clamp(jetMultiplier, 0.6f, 1.2f), 1.15f - Mathf.Clamp01(Scale) * 0.3f);
                 jetMultiplier = 1f;
                 IsGrounded = false;
                 Pose = OctopusPose.Normal;

@@ -87,10 +87,49 @@ namespace OctoEvo.EditorTools
                     d.cruiseSpeed = 0.6f; d.fleeSpeed = 4f; d.maxSpeed = 3f; d.turnRate = 1.5f;
                     d.noticeDistance = 5f; d.wariness = 0.3f; d.spawnWeight = 0.4f; d.minDepth = 1.5f;
                 }),
+                Get("Barracuda", d =>
+                {
+                    d.displayName = "Барракуда"; d.body = CreatureBody.Fish; d.habitat = CreatureHabitat.MidWater;
+                    d.minLength = 0.9f; d.maxLength = 1.5f; d.halfHeight = 0.08f; d.halfWidth = 0.06f;
+                    d.backColor = new Color(0.4f, 0.48f, 0.52f); d.bellyColor = new Color(0.85f, 0.88f, 0.9f);
+                    d.cruiseSpeed = 0.6f; d.fleeSpeed = 4f; d.maxSpeed = 4f; d.turnRate = 1.5f;
+                    d.schooling = true; d.groupSize = new Vector2Int(1, 3);
+                    d.noticeDistance = 6f; d.wariness = 0.2f; d.spawnWeight = 0.25f; d.minDepth = 2f;
+                }),
+                Get("TigerShark", d =>
+                {
+                    d.displayName = "Тигровая акула"; d.body = CreatureBody.Fish; d.habitat = CreatureHabitat.MidWater;
+                    d.minLength = 2.5f; d.maxLength = 3.5f; d.halfHeight = 0.1f; d.halfWidth = 0.08f;
+                    d.backColor = new Color(0.45f, 0.45f, 0.42f); d.bellyColor = new Color(0.85f, 0.85f, 0.82f);
+                    d.cruiseSpeed = 0.35f; d.fleeSpeed = 1.5f; d.maxSpeed = 3f; d.turnRate = 0.8f;
+                    d.noticeDistance = 10f; d.wariness = 0f; d.spawnWeight = 0.12f; d.minDepth = 3f;
+                }),
             };
+
+            // Модели из Tripo (если есть) — подключаем всегда, это не «настройки», а арт
+            Attach(list, "Shrimp", "Shrimp", 1f, 0.015f);
+            Attach(list, "Goby", "Goby", 1f, 0.05f);
+            Attach(list, "Chromis", "Chromis", 1f, 0.05f);
+            Attach(list, "Crab", "Crab", 1.6f, 0f);
+            Attach(list, "SergeantMajor", "SergeantMajor", 1f, 0.05f);
+            Attach(list, "Wrasse", "Wrasse", 1f, 0.05f);
+            Attach(list, "Grouper", "Grouper", 1f, 0.04f);
+            Attach(list, "Barracuda", "Barracuda", 1f, 0.04f);
+            Attach(list, "TigerShark", "TigerShark", 1f, 0.06f);
             AssetDatabase.SaveAssets();
             list.Sort((a, b) => a.minLength.CompareTo(b.minLength));
             return list.ToArray();
+        }
+
+        static void Attach(List<CreatureDefinition> list, string assetName, string model, float scale, float wave)
+        {
+            var d = list.Find(x => x != null && x.name == assetName);
+            if (d == null || !ArtLibrary.HasModel(model)) return;
+            d.modelMesh = ArtLibrary.Mesh(model);
+            d.modelMaterial = ArtLibrary.CreatureMaterial(model);
+            d.modelScale = scale;
+            d.swimWave = wave;
+            EditorUtility.SetDirty(d);
         }
 
         static CreatureDefinition Get(string file, Action<CreatureDefinition> setup)

@@ -60,6 +60,7 @@ namespace OctoEvo
             }
 
             if (motor != null) motor.RequestJet(jetBoost, true);
+            AudioDirector.Play(Sfx.Ink, at);
             LastMessage = "Чернила!";
             LastMessageTime = Time.time;
         }

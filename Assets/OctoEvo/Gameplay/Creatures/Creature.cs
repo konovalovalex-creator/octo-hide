@@ -43,6 +43,7 @@ namespace OctoEvo
         Vector3 wanderTarget;
         Vector3 fleeFrom;
         float struggle;
+        float nextWhoosh;
 
         static readonly int IdBase = Shader.PropertyToID("_BaseColor");
         static readonly int IdBelly = Shader.PropertyToID("_BellyColor");
@@ -56,6 +57,9 @@ namespace OctoEvo
         static readonly int IdTrans = Shader.PropertyToID("_Translucency");
         static readonly int IdPhase = Shader.PropertyToID("_SwimPhase");
         static readonly int IdAmp = Shader.PropertyToID("_SwimAmp");
+        static readonly int IdTint = Shader.PropertyToID("_Tint");
+        bool textured;
+        Color tint = Color.white;
 
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
@@ -77,15 +81,26 @@ namespace OctoEvo
             if (Def != def || visual == null) BuildVisual(def, material);
             Def = def;
 
-            float vis = def.body == CreatureBody.Crab ? length * 2f : length;
+            float vis;
+            if (textured)
+            {
+                vis = length * def.modelScale;
+                visual.localPosition = Vector3.zero;
+            }
+            else
+            {
+                vis = def.body == CreatureBody.Crab ? length * 2f : length;
+                visual.localPosition = def.body == CreatureBody.Crab ? new Vector3(0f, vis * 0.1f, 0f) : Vector3.zero;
+            }
             visual.localScale = Vector3.one * vis;
-            visual.localPosition = def.body == CreatureBody.Crab ? new Vector3(0f, vis * 0.1f, 0f) : Vector3.zero;
 
             // У каждой особи окрас немного свой
             float jitter = Random.Range(-0.06f, 0.06f);
             back = Shift(def.backColor, jitter);
             belly = Shift(def.bellyColor, jitter * 0.5f);
             pattern = Shift(def.patternColor, jitter);
+            float tj = Random.Range(-0.08f, 0.08f);
+            tint = new Color(1f + tj, 1f + tj * 0.5f, 1f - tj * 0.3f, 1f);
             ApplyProperties(0f);
 
             foreach (var r in renderers) r.shadowCastingMode = length > 0.12f ? ShadowCastingMode.On : ShadowCastingMode.Off;
@@ -100,6 +115,21 @@ namespace OctoEvo
             visual = new GameObject("Visual").transform;
             visual.SetParent(transform, false);
             var list = new List<Renderer>();
+            legs = null;
+            claws = null;
+            textured = def.modelMesh != null && def.modelMaterial != null;
+            if (textured)
+            {
+                var model = new GameObject("Model", typeof(MeshFilter), typeof(MeshRenderer));
+                model.transform.SetParent(visual, false);
+                model.GetComponent<MeshFilter>().sharedMesh = def.modelMesh;
+                var mr = model.GetComponent<MeshRenderer>();
+                mr.sharedMaterial = def.modelMaterial;
+                list.Add(mr);
+                renderers = list.ToArray();
+                mpb = new MaterialPropertyBlock();
+                return;
+            }
 
             var body = new GameObject("Body", typeof(MeshFilter), typeof(MeshRenderer));
             body.transform.SetParent(visual, false);
@@ -166,6 +196,13 @@ namespace OctoEvo
             mpb.SetFloat(IdSmooth, def.smoothness);
             mpb.SetFloat(IdTrans, def.translucency);
             mpb.SetFloat(IdPhase, swimPhase);
+            if (textured)
+            {
+                mpb.SetColor(IdTint, tint);
+                mpb.SetFloat(IdAmp, swimAmp * def.swimWave / 0.05f);
+                foreach (var r in renderers) r.SetPropertyBlock(mpb);
+                return;
+            }
             if (def.body == CreatureBody.Crab)
             {
                 mpb.SetFloat(IdHalfHeight, 0.08f);
@@ -265,6 +302,12 @@ namespace OctoEvo
             if (Director == null || Director.Player == null) return;
 
             Vector3 playerPos = Director.Player.transform.position;
+            // Крупная рыба проплывает рядом — низкое «вуум»
+            if (Length > 0.6f && Time.time > nextWhoosh && (transform.position - playerPos).sqrMagnitude < Length * Length * 9f && Velocity.sqrMagnitude > 0.25f)
+            {
+                nextWhoosh = Time.time + 10f;
+                AudioDirector.Play(Sfx.BigFish, transform.position, Mathf.Clamp01(Length / 2f) * 0.6f + 0.4f, 1.2f - Mathf.Clamp01(Length / 3f) * 0.4f);
+            }
             float playerLen = Director.PlayerLength;
             float ratio = Length / Mathf.Max(0.001f, playerLen);
             bool threatened = ratio <= 0.85f;
@@ -279,7 +322,12 @@ namespace OctoEvo
                 float d = Vector3.Distance(transform.position, playerPos);
                 if (d < notice)
                 {
-                    if (Current != State.Flee) nextDecision = 0f;
+                    if (Current != State.Flee)
+                    {
+                        nextDecision = 0f;
+                        if (Def.body == CreatureBody.Crab) AudioDirector.Play(Sfx.Crab, transform.position, 0.6f);
+                        else AudioDirector.Play(Sfx.FishScare, transform.position, Def.schooling ? 0.8f : 0.5f);
+                    }
                     Current = State.Flee;
                     fleeFrom = playerPos;
                     stateUntil = Time.time + Random.Range(2f, 3.5f);

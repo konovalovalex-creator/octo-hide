@@ -1,0 +1,3 @@
+newmtl SeaGrass
+Kd 1 1 1
+map_Kd SeaGrass_BaseColor.jpg

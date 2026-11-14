@@ -1,0 +1,3 @@
+newmtl BrainCoral
+Kd 1 1 1
+map_Kd BrainCoral_BaseColor.jpg

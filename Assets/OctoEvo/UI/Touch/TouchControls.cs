@@ -256,6 +256,7 @@ namespace OctoEvo.UI
         public void OnPointerDown(PointerEventData e)
         {
             onPress?.Invoke();
+            AudioDirector.Play(Sfx.Bubble, Vector3.zero, 0.35f, 1.3f);
             if (image != null) image.color = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Min(1f, baseColor.a * 2f));
         }
 

@@ -1,0 +1,3 @@
+newmtl BranchCoral
+Kd 1 1 1
+map_Kd BranchCoral_BaseColor.jpg

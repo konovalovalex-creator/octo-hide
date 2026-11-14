@@ -19,6 +19,14 @@ Shader "OctoEvo/CreatureLit"
         _SwimPhase ("Swim Phase", Float) = 0
         _SwimAmp ("Swim Amplitude (OS)", Float) = 0.06
         _WaveFreq ("Wave Frequency", Float) = 1.1
+
+        [Header(Textured model (Tripo))]
+        [Toggle(_TEXTURED)] _Textured ("Use Textures", Float) = 0
+        _BaseMap ("Albedo", 2D) = "white" {}
+        [Normal] _NormalMap ("Normal Map", 2D) = "bump" {}
+        _RoughnessMap ("Roughness (R)", 2D) = "gray" {}
+        _NormalStrength ("Normal Strength", Range(0, 2)) = 1
+        _Tint ("Tint (per individual)", Color) = (1,1,1,1)
     }
 
     SubShader
@@ -31,6 +39,10 @@ Shader "OctoEvo/CreatureLit"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
         #include "OctoCommon.hlsl"
         #include "OctoUnderwater.hlsl"
+
+        TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+        TEXTURE2D(_NormalMap); SAMPLER(sampler_NormalMap);
+        TEXTURE2D(_RoughnessMap); SAMPLER(sampler_RoughnessMap);
 
         CBUFFER_START(UnityPerMaterial)
             half4 _BaseColor;
@@ -46,6 +58,8 @@ Shader "OctoEvo/CreatureLit"
             float _SwimPhase;
             float _SwimAmp;
             float _WaveFreq;
+            half _NormalStrength;
+            half4 _Tint;
         CBUFFER_END
 
         // Волна бежит от головы к хвосту, амплитуда растёт к хвосту
@@ -70,11 +84,14 @@ Shader "OctoEvo/CreatureLit"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_instancing
+            #pragma shader_feature_local _TEXTURED
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                float4 tangentOS : TANGENT;
+                float2 uv : TEXCOORD0;
                 half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -85,6 +102,8 @@ Shader "OctoEvo/CreatureLit"
                 float3 normalWS   : TEXCOORD1;
                 float3 positionOS : TEXCOORD2;
                 half body         : TEXCOORD3;
+                float2 uv         : TEXCOORD4;
+                float4 tangentWS  : TEXCOORD5;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -100,6 +119,9 @@ Shader "OctoEvo/CreatureLit"
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
                 o.positionOS = v.positionOS.xyz;
                 o.body = v.color.r;
+                o.uv = v.uv;
+                VertexNormalInputs ni = GetVertexNormalInputs(v.normalOS, v.tangentOS);
+                o.tangentWS = float4(ni.tangentWS, v.tangentOS.w * GetOddNegativeScale());
                 return o;
             }
 
@@ -123,6 +145,19 @@ Shader "OctoEvo/CreatureLit"
                 UNITY_SETUP_INSTANCE_ID(i);
                 float3 n = normalize(i.normalWS) * (IS_FRONT_VFACE(face, 1, -1));
                 float3 p = i.positionOS;
+
+            #if defined(_TEXTURED)
+                half3 texAlbedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).rgb * _Tint.rgb;
+                half3 nTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, i.uv), _NormalStrength);
+                float3 t = normalize(i.tangentWS.xyz);
+                float3 b = cross(n, t) * i.tangentWS.w;
+                float3 nTex = normalize(mul(nTS, float3x3(t, b, n)));
+                half rough = SAMPLE_TEXTURE2D(_RoughnessMap, sampler_RoughnessMap, i.uv).r;
+                half smoothTex = saturate((1.0 - rough) * 0.8 + 0.1);
+                half3 colTex = UW_Shade(texAlbedo, i.positionWS, nTex, i.positionCS, smoothTex, 1.0);
+                colTex = lerp(colTex, UW_WaterColorAt(i.positionWS) * 0.9 + texAlbedo * 0.15, _Translucency * 0.5);
+                return half4(colTex, 1);
+            #endif
 
                 // противотень: тёмная спина, светлое брюхо
                 half belly = 1.0 - smoothstep(-0.55, 0.35, p.y / max(1e-4, _HalfHeight));

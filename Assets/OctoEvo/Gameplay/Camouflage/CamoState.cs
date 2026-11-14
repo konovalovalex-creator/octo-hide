@@ -16,6 +16,7 @@ namespace OctoEvo
         public Color average;          // средний цвет узора (с учётом tint) — для смаза в движении и оценки заметности
         public Matrix4x4 captureLocalToWorld; // поза осьминога в момент копирования
         public int sourceSurfaceId;    // 0 — ручная палитра
+        public bool natural;           // естественный окрас модели (текстура из Tripo)
 
         public bool IsFromSurface => sourceSurfaceId != 0;
     }

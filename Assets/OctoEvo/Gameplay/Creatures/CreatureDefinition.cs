@@ -24,6 +24,15 @@ namespace OctoEvo
         public float minLength = 0.06f;
         public float maxLength = 0.1f;
 
+        [Header("Модель (если задана — вместо процедурной)")]
+        [Tooltip("Меш нормализован: голова по +Z, длина 1 (у краба — размах 1, низ на y = 0)")]
+        public Mesh modelMesh;
+        public Material modelMaterial;
+        [Tooltip("Во сколько раз модель крупнее «длины» вида (краб: размах ног больше ширины панциря)")]
+        public float modelScale = 1f;
+        [Tooltip("Амплитуда плавательной волны (в долях длины). 0 — не изгибать (крабы, креветки)")]
+        public float swimWave = 0.05f;
+
         [Header("Форма (в долях длины)")]
         public float halfHeight = 0.12f;
         public float halfWidth = 0.05f;

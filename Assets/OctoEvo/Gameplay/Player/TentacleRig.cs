@@ -23,6 +23,13 @@ namespace OctoEvo
         public float rootRing = 0.28f;
         public float rootHeight = -0.24f;
 
+        [Header("Модель")]
+        [Tooltip("Рисовать собственные трубки. Выключается, когда щупальца модели гнёт OctopusModelRig.")]
+        public bool renderTubes = true;
+        /// <summary>Корни щупалец и направления «наружу» в локальных координатах осьминога (из модели).</summary>
+        [System.NonSerialized] public Vector3[] customRoots;
+        [System.NonSerialized] public Vector3[] customOut;
+
         [Header("Шаги")]
         public float reach = 0.85f;
         public float stepDistance = 0.45f;
@@ -89,6 +96,20 @@ namespace OctoEvo
             foreach (var tc in tentacles) tc.reachTarget = null;
         }
 
+        public int Segments => segments;
+        /// <summary>Точки цепочки щупальца (мир), 0 — корень. Не изменять.</summary>
+        public Vector3[] Chain(int index) => tentacles != null && index >= 0 && index < tentacles.Length ? tentacles[index].pos : null;
+
+        /// <summary>Подставить корни из модели и пересобрать цепочки.</summary>
+        public void SetCustomRoots(Vector3[] roots, Vector3[] outDirs, float armLength)
+        {
+            customRoots = roots;
+            customOut = outDirs;
+            tentacleCount = roots.Length;
+            length = armLength;
+            if (mesh != null) Build();
+        }
+
         public Vector3 TipPosition(int index)
         {
             if (tentacles == null || index < 0 || index >= tentacles.Length) return transform.position;
@@ -101,6 +122,7 @@ namespace OctoEvo
             mesh = new Mesh { name = "TentacleRig" };
             mesh.MarkDynamic();
             GetComponent<MeshFilter>().sharedMesh = mesh;
+            if (!renderTubes) GetComponent<MeshRenderer>().enabled = false;
             Build();
         }
 
@@ -172,6 +194,7 @@ namespace OctoEvo
 
         Vector3 RootLocal(int t)
         {
+            if (customRoots != null && t < customRoots.Length) return customRoots[t] + Vector3.up * liftNow;
             float a = (t + 0.5f) / tentacleCount * Mathf.PI * 2f;
             return new Vector3(Mathf.Sin(a) * rootRing, rootHeight + liftNow, Mathf.Cos(a) * rootRing);
         }
@@ -180,6 +203,7 @@ namespace OctoEvo
 
         Vector3 OutWorld(Transform root, int t)
         {
+            if (customOut != null && t < customOut.Length) return root.TransformDirection(customOut[t]);
             Vector3 l = RootLocal(t);
             l.y = 0f;
             return root.TransformDirection(l.normalized);
@@ -315,6 +339,8 @@ namespace OctoEvo
                     if (tc.stepT < 1f)
                     {
                         tc.stepT = Mathf.Min(1f, tc.stepT + dt / stepDuration);
+                        if (tc.stepT >= 1f && controller.isLocalPlayer)
+                            AudioDirector.Play(Sfx.Crawl, tc.foot, 0.35f, 1.3f - Mathf.Clamp01(S) * 0.4f);
                         float e = tc.stepT * tc.stepT * (3f - 2f * tc.stepT);
                         tc.foot = Vector3.Lerp(tc.footFrom, tc.footTo, e) + up * Mathf.Sin(e * Mathf.PI) * stepHeight * S;
                     }
@@ -329,7 +355,7 @@ namespace OctoEvo
                 Simulate(tc, rootPos, outDir, up, cfg, dt);
             }
 
-            RebuildMesh(root);
+            if (renderTubes) RebuildMesh(root);
         }
 
         void Simulate(Tentacle tc, Vector3 rootPos, Vector3 outDir, Vector3 up, PoseCfg cfg, float dt)

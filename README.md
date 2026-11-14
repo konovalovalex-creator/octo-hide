@@ -40,7 +40,9 @@ Assets/OctoEvo/
   Gameplay/   осьминог, маскировка, существа, мир     (OctoEvo.Gameplay)
   UI/         интерфейс                               (OctoEvo.UI)
   Editor/     генераторы сцены и ассетов, сборки      (OctoEvo.Editor)
-  Data/       виды существ (CreatureDefinition)
+  Art/        модели из Tripo (OBJ + текстуры) и сканы ambientCG — настройки импорта задаёт OctoArtPostprocessor
+  Audio/      эффекты (Sfx), фоновые петли (Ambient), музыка (Music)
+  Data/       виды существ (CreatureDefinition), набор звуков (SoundBank)
   Shaders/    подводная оптика, окружение, кожа, существа, лучи, поверхность воды
   Generated/  то, что создаёт Build Reef Scene
 ```
@@ -53,3 +55,12 @@ Assets/OctoEvo/
 
 Временные текстуры генерируются процедурно; позже заменяются сканами (Poly Haven / ambientCG) —
 достаточно подставить их в материалы из `Generated/Materials`.
+
+## Арт и звук
+
+Модели из Tripo конвертируются в OBJ (рыбы — головой по +Z, длина 1; предметы — низ на y = 0, размер 1).
+Осьминог из Tripo «оживляется» компонентом `OctopusModelRig`: он сам находит 8 щупалец
+и гнёт их по физике `TentacleRig`. Требование к модели — поза «звездой», щупальца не касаются друг друга.
+
+Звуки раскладываются по имени файла: `Jet_1.wav`, `Jet_2.wav` → эффект `Jet`. Набор можно переназначить
+в ассете `Data/SoundBank`.

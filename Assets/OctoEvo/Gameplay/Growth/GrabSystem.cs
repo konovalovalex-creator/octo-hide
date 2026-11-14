@@ -112,6 +112,7 @@ namespace OctoEvo
             Target = best;
             tentacle = rig.ReachTo(best.transform);
             if (tentacle < 0) { Target = null; return; }
+            AudioDirector.Play(Sfx.TentacleShot, transform.position, 0.7f);
             timer = 0f;
             Current = Phase.Reaching;
         }
@@ -129,6 +130,7 @@ namespace OctoEvo
             if ((tip - Target.transform.position).sqrMagnitude < catchDist * catchDist)
             {
                 Target.SetGrabbed(true);
+                AudioDirector.Play(Sfx.Grab, Target.transform.position, 0.8f);
                 catchLocal = transform.InverseTransformPoint(Target.transform.position);
                 float r = Target.Length / Length;
                 holdTime = Mathf.Max(pullTime, eatTimeBase + r * eatTimePerRatio);
@@ -143,6 +145,7 @@ namespace OctoEvo
             if (timer > reachTimeout || (Target.transform.position - transform.position).sqrMagnitude > maxRange * maxRange)
             {
                 Say("Промах!");
+                AudioDirector.Play(Sfx.Miss, transform.position, 0.6f);
                 Release(false);
                 cooldownUntil = Time.time + missCooldown;
             }
@@ -174,6 +177,7 @@ namespace OctoEvo
             {
                 var prey = Target;
                 if (growth != null) growth.Eat(prey);
+                AudioDirector.Play(Sfx.Eat, prey.transform.position, 0.8f);
                 Release(true);
                 if (prey.Director != null) prey.Director.Despawn(prey);
                 else prey.gameObject.SetActive(false);

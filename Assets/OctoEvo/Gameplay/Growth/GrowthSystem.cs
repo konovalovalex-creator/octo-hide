@@ -43,6 +43,7 @@ namespace OctoEvo
 
         public event Action<Creature, float> OnAte;
 
+        float nextGrowthSound;
         readonly HashSet<CreatureDefinition> announced = new HashSet<CreatureDefinition>();
 
         public static float Yield(float ratio) => Mathf.Clamp01((ratio - 0.05f) / 0.35f);
@@ -51,6 +52,7 @@ namespace OctoEvo
         void Awake()
         {
             VisibleLength = Length;
+            nextGrowthSound = Length * 1.25f;
             ApplyScale();
             if (milestones != null)
                 foreach (var m in milestones)
@@ -87,6 +89,12 @@ namespace OctoEvo
             else Say($"{name}: +{gain:0.###} биомассы");
 
             CheckMilestones(before);
+            // Каждые +25% длины — звук роста
+            if (Length >= nextGrowthSound)
+            {
+                nextGrowthSound = Length * 1.25f;
+                AudioDirector.Play(Sfx.Growth, transform.position);
+            }
             OnAte?.Invoke(prey, gain);
             return gain;
         }
@@ -101,6 +109,7 @@ namespace OctoEvo
                 {
                     announced.Add(m);
                     Say($"Ты вырос до {FormatLength(Length)}! Теперь по силам: {m.displayName}");
+                    AudioDirector.Play(Sfx.NewPrey, transform.position);
                 }
             }
         }

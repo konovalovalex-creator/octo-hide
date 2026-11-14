@@ -63,9 +63,13 @@ namespace OctoEvo
 
         void Update()
         {
-            if (lids == null) return;
-
             if (isLocal && OctoInput.EyesTogglePressed) WantsClosed = !WantsClosed;
+            if (lids == null)
+            {
+                // У модели из Tripo век нет — «прищур» только влияет на заметность
+                Closed = Mathf.MoveTowards(Closed, WantsClosed ? 1f : 0f, Time.deltaTime * 6f);
+                return;
+            }
 
             if (!WantsClosed && Time.time >= nextBlink)
             {

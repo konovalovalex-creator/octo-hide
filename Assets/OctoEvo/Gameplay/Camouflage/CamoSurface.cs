@@ -16,6 +16,11 @@ namespace OctoEvo
         [Tooltip("Если не задан — берётся первый Renderer на объекте или в дочерних.")]
         public Renderer targetRenderer;
 
+        [Tooltip("Средний цвет текстуры, посчитанный заранее (текстуры в игре нечитаемы). Альфа 0 — не задан.")]
+        public Color bakedAverage = new Color(0f, 0f, 0f, 0f);
+        [Tooltip("Материал с UV-развёрткой (кораллы, губки): копировать только цвет, узор — пятнистый")]
+        public bool colorOnly = false;
+
         public Texture Pattern { get; private set; }
         public Color Tint { get; private set; } = Color.white;
         public float Scale { get; private set; } = 1f;
@@ -43,12 +48,23 @@ namespace OctoEvo
             Pattern = tex;
             Tint = tint;
             Scale = scale;
-            Average = AverageOf(tex) * tint;
+            Average = (bakedAverage.a > 0f ? bakedAverage : AverageOf(tex)) * tint;
             Average = new Color(Average.r, Average.g, Average.b, 1f);
         }
 
         public CamoState ToState(Matrix4x4 capturePose)
         {
+            if (colorOnly)
+                return new CamoState
+                {
+                    pattern = CamoUtil.MottleTexture,
+                    tint = Average / CamoUtil.MottleAverage,
+                    scale = 2f,
+                    papillae = papillae,
+                    average = Average,
+                    captureLocalToWorld = capturePose,
+                    sourceSurfaceId = Id
+                };
             return new CamoState
             {
                 pattern = Pattern != null ? Pattern : Texture2D.whiteTexture,

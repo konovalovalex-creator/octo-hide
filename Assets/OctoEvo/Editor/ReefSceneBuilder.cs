@@ -63,6 +63,17 @@ namespace OctoEvo.EditorTools
                 var mPlain = EnvMat("Plain", env, white, null, Color.white, 1f, 0.5f, 0f);
                 var mEye = EnvMat("Octo_Eye", env, white, null, new Color(0.78f, 0.62f, 0.28f), 1f, 0.9f, 0f);
                 var mPupil = EnvMat("Octo_Pupil", env, white, null, new Color(0.02f, 0.02f, 0.02f), 1f, 0.95f, 0f);
+                // Сканы из ambientCG — если лежат в Art/Textures, заменяют процедурные текстуры
+                var mReefRock = mCoral;
+                if (ArtLibrary.HasGround("Sand"))
+                    mSand = ArtLibrary.GroundMaterial("Sand", "Sand", 0.4f, "Gravel", 0.35f, coverage: 0.28f, patchSize: 0.07f, normalStrength: 0.9f, smoothness: 0.15f);
+                if (ArtLibrary.HasGround("DarkRock"))
+                    mRock = ArtLibrary.GroundMaterial("Rock", "DarkRock", 0.22f, "MossRock", 0.3f, coverage: 0.45f, preferUp: 0.9f, patchSize: 0.2f, normalStrength: 1.2f, smoothness: 0.25f);
+                if (ArtLibrary.HasGround("ReefRock"))
+                    mReefRock = ArtLibrary.GroundMaterial("ReefRock", "ReefRock", 0.5f, "AlgaeGround", 0.4f, coverage: 0.4f, preferUp: 0.7f, patchSize: 0.3f, normalStrength: 1.1f, smoothness: 0.2f);
+                Color sandAvg = ArtLibrary.AverageColor(mSand.GetTexture("_BaseMap"));
+                Color rockAvg = ArtLibrary.AverageColor(mRock.GetTexture("_BaseMap"));
+                Color reefAvg = ArtLibrary.AverageColor(mReefRock.GetTexture("_BaseMap"));
                 var mSkin = SaveMat(new Material(skin), "Octo_Skin");
                 var mRay = SaveMat(new Material(ray), "GodRay");
                 var mSnow = SaveMat(new Material(particle), "MarineSnow");
@@ -137,7 +148,9 @@ namespace OctoEvo.EditorTools
                 // ---------- Дно
                 var world = new GameObject("World").transform;
                 var seabed = MeshObject("Seabed", seabedMesh, mSand, world, Vector3.zero, Quaternion.identity, Vector3.one);
-                seabed.AddComponent<CamoSurface>().papillae = 0.1f;
+                var seabedCamo = seabed.AddComponent<CamoSurface>();
+                seabedCamo.papillae = 0.1f;
+                seabedCamo.bakedAverage = sandAvg;
 
                 // ---------- Скалы по кругу
                 var cliffs = new GameObject("Cliffs").transform;
@@ -149,7 +162,7 @@ namespace OctoEvo.EditorTools
                     var pos = new Vector3(Mathf.Cos(a) * r, -1f, Mathf.Sin(a) * r);
                     var scale = new Vector3(Rand(rnd, 7f, 12f), Rand(rnd, 6f, 13f), Rand(rnd, 6f, 10f));
                     var go = MeshObject("Cliff", rocks[rnd.Next(rocks.Length)], mRock, cliffs, pos, Quaternion.Euler(Rand(rnd, -10, 10), Rand(rnd, 0, 360), Rand(rnd, -10, 10)), scale);
-                    go.AddComponent<CamoSurface>().papillae = 0.75f;
+                    RockCamo(go, rockAvg);
                 }
 
                 // ---------- Валуны
@@ -164,7 +177,7 @@ namespace OctoEvo.EditorTools
                     var go = MeshObject("Boulder", rocks[rnd.Next(rocks.Length)], mRock, boulders, p,
                         Quaternion.Euler(Rand(rnd, -15, 15), Rand(rnd, 0, 360), Rand(rnd, -15, 15)),
                         new Vector3(s * Rand(rnd, 0.9f, 1.4f), s * Rand(rnd, 0.6f, 1f), s * Rand(rnd, 0.9f, 1.4f)));
-                    go.AddComponent<CamoSurface>().papillae = 0.75f;
+                    RockCamo(go, rockAvg);
                 }
 
                 // ---------- Арка
@@ -196,56 +209,11 @@ namespace OctoEvo.EditorTools
                 LocalRock("Support", rocks[0], mRock, ledge, new Vector3(-2.5f, 0.6f, 0f), new Vector3(2.4f, 2f, 2.6f), Vector3.zero);
                 LocalRock("Slab", rocks[3], mRock, ledge, new Vector3(0f, 1.9f, 0f), new Vector3(6.5f, 0.9f, 4.2f), new Vector3(-5, 10, 8));
 
-                // ---------- Риф: коралловые головы и ветвистые кораллы
-                var reef = new GameObject("Reef").transform;
-                reef.SetParent(world);
-                Color[] coralTints = { Color.white, new Color(1f, 0.85f, 0.75f), new Color(0.9f, 0.8f, 1f), new Color(1f, 0.95f, 0.7f) };
-                for (int i = 0; i < 28; i++)
-                {
-                    var p = new Vector3(Rand(rnd, 5f, 22f), 0f, Rand(rnd, -20f, -4f));
-                    float s = Rand(rnd, 0.6f, 2f);
-                    p.y = GroundY(p) + s * 0.1f;
-                    var go = MeshObject("CoralHead", coralHeads[rnd.Next(coralHeads.Length)], mCoral, reef, p,
-                        Quaternion.Euler(0, Rand(rnd, 0, 360), 0), new Vector3(s, s * Rand(rnd, 0.5f, 0.8f), s));
-                    go.AddComponent<CamoSurface>().papillae = 0.9f;
-                    Tint(go, coralTints[rnd.Next(coralTints.Length)]);
-                }
-                for (int i = 0; i < 40; i++)
-                {
-                    var c = new Vector3(Rand(rnd, 6f, 21f), 0f, Rand(rnd, -19f, -5f));
-                    float h = Rand(rnd, 0.4f, 1.3f);
-                    var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                    go.name = "CoralBranch";
-                    go.transform.SetParent(reef);
-                    go.transform.position = c + Vector3.up * (GroundY(c) + h * 0.8f);
-                    go.transform.localScale = new Vector3(0.14f, h, 0.14f);
-                    go.transform.rotation = Quaternion.Euler(Rand(rnd, -30f, 30f), Rand(rnd, 0, 360), Rand(rnd, -30f, 30f));
-                    go.GetComponent<Renderer>().sharedMaterial = mCoral;
-                    go.AddComponent<CamoSurface>().papillae = 0.9f;
-                    Tint(go, coralTints[rnd.Next(coralTints.Length)]);
-                }
-
-                // ---------- Водоросли
-                var kelpRoot = new GameObject("Kelp").transform;
-                kelpRoot.SetParent(world);
-                Vector3[] kelpCenters = { new Vector3(-10f, 0f, 3f), new Vector3(3f, 0f, 14f), new Vector3(-20f, 0f, -20f) };
-                foreach (var kc in kelpCenters)
-                {
-                    for (int i = 0; i < 10; i++)
-                    {
-                        var k = new GameObject("KelpStalk").AddComponent<KelpSway>();
-                        k.transform.SetParent(kelpRoot);
-                        var p = kc + new Vector3(Rand(rnd, -3f, 3f), 0f, Rand(rnd, -3f, 3f));
-                        p.y = GroundY(p);
-                        k.transform.position = p;
-                        k.transform.rotation = Quaternion.Euler(0f, Rand(rnd, 0, 360), 0f);
-                        k.material = mKelp;
-                        k.tint = Color.white;
-                        k.height = Rand(rnd, 3f, 7f);
-                        k.width = Rand(rnd, 0.2f, 0.35f);
-                        k.segments = 8;
-                    }
-                }
+                // ---------- Риф и водоросли
+                if (ArtLibrary.HasModel("BrainCoral"))
+                    BuildReefFromModels(world, rnd, mReefRock, reefAvg, rocks);
+                else
+                    BuildReefProcedural(world, rnd, coralHeads, mCoral, mKelp);
 
                 // ---------- Мелкие камни
                 var small = new GameObject("Pebbles").transform;
@@ -285,6 +253,13 @@ namespace OctoEvo.EditorTools
                 spawner.meter = octo.GetComponent<ConspicuityMeter>();
                 spawner.areaCenter = Vector3.zero;
                 spawner.areaSize = new Vector2(90f, 90f);
+
+                // ---------- Звук
+                var audioGo = new GameObject("Audio");
+                var audioDir = audioGo.AddComponent<AudioDirector>();
+                audioDir.bank = AudioSetup.EnsureBank();
+                audioDir.player = grab.motor;
+                audioDir.growth = growth;
 
                 // ---------- Сенсорное управление (на ПК скрыто, F2 — показать)
                 new GameObject("TouchControls").AddComponent<TouchControls>();
@@ -326,18 +301,41 @@ namespace OctoEvo.EditorTools
             body.SetParent(root.transform, false);
             body.localPosition = new Vector3(0f, -0.12f, 0f);
 
-            var head = Primitive(PrimitiveType.Sphere, "Head", body, new Vector3(0f, 0.04f, 0.05f), new Vector3(0.62f, 0.52f, 0.62f), skin);
-            var mantle = Primitive(PrimitiveType.Sphere, "Mantle", body, new Vector3(0f, 0.3f, -0.36f), new Vector3(0.68f, 0.72f, 1.05f), skin);
-            mantle.transform.localRotation = Quaternion.Euler(-28f, 0f, 0f);
-
-            // Глаза: золотистое глазное яблоко и горизонтальный щелевидный зрачок, как у настоящего осьминога
+            // Модель из Tripo (если есть): тело и щупальца одной кожей, щупальца гнёт OctopusModelRig
+            bool useModel = ArtLibrary.HasModel("Octopus") && ArtLibrary.Mesh("Octopus") != null;
+            var skinRenderers = new System.Collections.Generic.List<Renderer>();
             var eyeList = new System.Collections.Generic.List<Transform>();
-            for (int s = -1; s <= 1; s += 2)
+            GameObject modelGo = null;
+            if (useModel)
             {
-                var eye = Primitive(PrimitiveType.Sphere, s < 0 ? "EyeL" : "EyeR", body, new Vector3(0.21f * s, 0.2f, 0.16f), Vector3.one * 0.15f, eyeMat);
-                var pupil = Primitive(PrimitiveType.Cube, "Pupil", eye.transform, new Vector3(0.12f * s, 0f, 0.42f), new Vector3(0.55f, 0.13f, 0.2f), pupilMat);
-                pupil.transform.localRotation = Quaternion.Euler(0f, 25f * s, 0f);
-                eyeList.Add(eye.transform);
+                skin.SetFloat("_UseNatural", 1f);
+                skin.SetTexture("_NaturalMap", ArtLibrary.ModelTex("Octopus", "BaseColor"));
+                var nrm = ArtLibrary.ModelTex("Octopus", "Normal");
+                if (nrm != null) skin.SetTexture("_NaturalNormal", nrm);
+                EditorUtility.SetDirty(skin);
+                modelGo = new GameObject("OctopusModel", typeof(MeshFilter), typeof(MeshRenderer));
+                modelGo.transform.SetParent(root.transform, false);
+                modelGo.GetComponent<MeshFilter>().sharedMesh = ArtLibrary.Mesh("Octopus");
+                modelGo.GetComponent<MeshRenderer>().sharedMaterial = skin;
+                skinRenderers.Add(modelGo.GetComponent<MeshRenderer>());
+            }
+            else
+            {
+                skin.SetFloat("_UseNatural", 0f);
+                var head = Primitive(PrimitiveType.Sphere, "Head", body, new Vector3(0f, 0.04f, 0.05f), new Vector3(0.62f, 0.52f, 0.62f), skin);
+                var mantle = Primitive(PrimitiveType.Sphere, "Mantle", body, new Vector3(0f, 0.3f, -0.36f), new Vector3(0.68f, 0.72f, 1.05f), skin);
+                mantle.transform.localRotation = Quaternion.Euler(-28f, 0f, 0f);
+                skinRenderers.Add(head.GetComponent<Renderer>());
+                skinRenderers.Add(mantle.GetComponent<Renderer>());
+
+                // Глаза: золотистое глазное яблоко и горизонтальный щелевидный зрачок, как у настоящего осьминога
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    var eye = Primitive(PrimitiveType.Sphere, s < 0 ? "EyeL" : "EyeR", body, new Vector3(0.21f * s, 0.2f, 0.16f), Vector3.one * 0.15f, eyeMat);
+                    var pupil = Primitive(PrimitiveType.Cube, "Pupil", eye.transform, new Vector3(0.12f * s, 0f, 0.42f), new Vector3(0.55f, 0.13f, 0.2f), pupilMat);
+                    pupil.transform.localRotation = Quaternion.Euler(0f, 25f * s, 0f);
+                    eyeList.Add(eye.transform);
+                }
             }
 
             var tentGo = new GameObject("Tentacles", typeof(MeshFilter), typeof(MeshRenderer));
@@ -351,11 +349,24 @@ namespace OctoEvo.EditorTools
 
             var tent = tentGo.AddComponent<TentacleRig>();
             tent.controller = motor;
+            skinRenderers.Add(tentGo.GetComponent<Renderer>());
+            if (useModel)
+            {
+                tent.renderTubes = false;
+                var mrig = modelGo.AddComponent<OctopusModelRig>();
+                mrig.sourceMesh = ArtLibrary.Mesh("Octopus");
+                mrig.motor = motor;
+                mrig.rig = tent;
+                mrig.body = body;
+                mrig.armLength = 1.1f;
+                mrig.groundOffset = -col.radius;
+            }
 
             var skinComp = root.AddComponent<CamouflageSkin>();
             skinComp.controller = motor;
             skinComp.skinMaterialTemplate = skin;
-            skinComp.skinRenderers = new Renderer[] { head.GetComponent<Renderer>(), mantle.GetComponent<Renderer>(), tentGo.GetComponent<Renderer>() };
+            skinComp.skinRenderers = skinRenderers.ToArray();
+            if (useModel) skinComp.naturalAverage = ArtLibrary.AverageColor(ArtLibrary.ModelTex("Octopus", "BaseColor"));
 
             var eyes = root.AddComponent<OctopusEyes>();
             eyes.skin = skinComp;
@@ -406,6 +417,196 @@ namespace OctoEvo.EditorTools
             EditorUtility.SetDirty(profile);
             AssetDatabase.SaveAssets();
             return profile;
+        }
+
+
+        // ------------------------------------------------------------------ риф
+
+        static void BuildReefProcedural(Transform world, System.Random rnd, Mesh[] coralHeads, Material mCoral, Material mKelp)
+        {
+            // ---------- Риф: коралловые головы и ветвистые кораллы
+            var reef = new GameObject("Reef").transform;
+            reef.SetParent(world);
+            Color[] coralTints = { Color.white, new Color(1f, 0.85f, 0.75f), new Color(0.9f, 0.8f, 1f), new Color(1f, 0.95f, 0.7f) };
+            for (int i = 0; i < 28; i++)
+            {
+                var p = new Vector3(Rand(rnd, 5f, 22f), 0f, Rand(rnd, -20f, -4f));
+                float s = Rand(rnd, 0.6f, 2f);
+                p.y = GroundY(p) + s * 0.1f;
+                var go = MeshObject("CoralHead", coralHeads[rnd.Next(coralHeads.Length)], mCoral, reef, p,
+                    Quaternion.Euler(0, Rand(rnd, 0, 360), 0), new Vector3(s, s * Rand(rnd, 0.5f, 0.8f), s));
+                go.AddComponent<CamoSurface>().papillae = 0.9f;
+                Tint(go, coralTints[rnd.Next(coralTints.Length)]);
+            }
+            for (int i = 0; i < 40; i++)
+            {
+                var c = new Vector3(Rand(rnd, 6f, 21f), 0f, Rand(rnd, -19f, -5f));
+                float h = Rand(rnd, 0.4f, 1.3f);
+                var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                go.name = "CoralBranch";
+                go.transform.SetParent(reef);
+                go.transform.position = c + Vector3.up * (GroundY(c) + h * 0.8f);
+                go.transform.localScale = new Vector3(0.14f, h, 0.14f);
+                go.transform.rotation = Quaternion.Euler(Rand(rnd, -30f, 30f), Rand(rnd, 0, 360), Rand(rnd, -30f, 30f));
+                go.GetComponent<Renderer>().sharedMaterial = mCoral;
+                go.AddComponent<CamoSurface>().papillae = 0.9f;
+                Tint(go, coralTints[rnd.Next(coralTints.Length)]);
+            }
+
+            // ---------- Водоросли
+            var kelpRoot = new GameObject("Kelp").transform;
+            kelpRoot.SetParent(world);
+            Vector3[] kelpCenters = { new Vector3(-10f, 0f, 3f), new Vector3(3f, 0f, 14f), new Vector3(-20f, 0f, -20f) };
+            foreach (var kc in kelpCenters)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    var k = new GameObject("KelpStalk").AddComponent<KelpSway>();
+                    k.transform.SetParent(kelpRoot);
+                    var p = kc + new Vector3(Rand(rnd, -3f, 3f), 0f, Rand(rnd, -3f, 3f));
+                    p.y = GroundY(p);
+                    k.transform.position = p;
+                    k.transform.rotation = Quaternion.Euler(0f, Rand(rnd, 0, 360), 0f);
+                    k.material = mKelp;
+                    k.tint = Color.white;
+                    k.height = Rand(rnd, 3f, 7f);
+                    k.width = Rand(rnd, 0.2f, 0.35f);
+                    k.segments = 8;
+                }
+            }
+
+        }
+
+        static GameObject Prop(string model, Material mat, Transform parent, Vector3 pos, float size, float yaw, bool collider, float sink = 0.03f)
+        {
+            var mesh = ArtLibrary.Mesh(model);
+            if (mesh == null) return null;
+            pos.y -= size * sink;
+            var go = new GameObject(model, typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(parent, false);
+            go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
+            go.transform.localScale = Vector3.one * size;
+            go.GetComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
+            if (size < 0.4f) mr.shadowCastingMode = ShadowCastingMode.Off;
+            if (collider) go.AddComponent<MeshCollider>().sharedMesh = mesh;
+            go.isStatic = mat.GetFloat("_SwayAmount") <= 0f;
+            return go;
+        }
+
+        static void PropCamo(GameObject go, Material mat, float papillae)
+        {
+            if (go == null) return;
+            var c = go.AddComponent<CamoSurface>();
+            c.colorOnly = true;
+            c.papillae = papillae;
+            c.bakedAverage = ArtLibrary.AverageColor(mat.GetTexture("_BaseMap"));
+        }
+
+        static void RockCamo(GameObject go, Color avg)
+        {
+            var c = go.AddComponent<CamoSurface>();
+            c.papillae = 0.75f;
+            c.bakedAverage = avg;
+        }
+
+        /// <summary>Риф из моделей Tripo: скальное основание, кораллы, губки, анемоны, водоросли, мелочь на дне.</summary>
+        static void BuildReefFromModels(Transform world, System.Random rnd, Material mReefRock, Color reefAvg, Mesh[] rocks)
+        {
+            var reef = new GameObject("Reef").transform;
+            reef.SetParent(world);
+
+            var mBrain = ArtLibrary.PropMaterial("BrainCoral", smoothness: 0.6f);
+            var mBranch = ArtLibrary.PropMaterial("BranchCoral", smoothness: 0.6f);
+            var mStag = ArtLibrary.PropMaterial("StaghornCoral", smoothness: 0.6f);
+            var mFan = ArtLibrary.PropMaterial("SeaFan", sway: 0.04f, swaySpeed: 0.8f, translucency: 0.4f);
+            var mAnemone = ArtLibrary.PropMaterial("Anemone", sway: 0.08f, swaySpeed: 1.6f, translucency: 0.3f);
+            var mSponge = ArtLibrary.PropMaterial("Sponge", smoothness: 0.3f);
+            var mUrchin = ArtLibrary.PropMaterial("Urchin", smoothness: 0.7f);
+            var mStar = ArtLibrary.PropMaterial("Starfish", smoothness: 0.5f);
+            var mShell = ArtLibrary.PropMaterial("Seashell", smoothness: 0.9f);
+            var mWeed = ArtLibrary.PropMaterial("Seaweed", sway: 0.12f, swaySpeed: 0.9f, translucency: 0.6f);
+            var mGrass = ArtLibrary.PropMaterial("SeaGrass", sway: 0.15f, swaySpeed: 1.3f, translucency: 0.6f);
+            var mMoray = ArtLibrary.PropMaterial("Moray", smoothness: 0.8f);
+
+            // Скальные «бомми» — основание рифа, обросшее кораллами
+            var bommies = new System.Collections.Generic.List<Vector3>();
+            for (int i = 0; i < 14; i++)
+            {
+                var p = new Vector3(Rand(rnd, 5f, 22f), 0f, Rand(rnd, -21f, -4f));
+                float s = Rand(rnd, 1.2f, 2.8f);
+                p.y = GroundY(p) + s * 0.05f;
+                var go = MeshObject("ReefRock", rocks[rnd.Next(rocks.Length)], mReefRock, reef, p,
+                    Quaternion.Euler(Rand(rnd, -8, 8), Rand(rnd, 0, 360), Rand(rnd, -8, 8)), new Vector3(s, s * Rand(rnd, 0.5f, 0.8f), s));
+                RockCamo(go, reefAvg);
+                bommies.Add(p);
+            }
+            Physics.SyncTransforms();
+
+            // Кораллы на рифе: на земле и на бомми
+            for (int i = 0; i < 70; i++)
+            {
+                var p = new Vector3(Rand(rnd, 4f, 23f), 0f, Rand(rnd, -22f, -3f));
+                p.y = GroundY(p);
+                int kind = rnd.Next(10);
+                float yaw = Rand(rnd, 0, 360);
+                GameObject go;
+                if (kind < 3) { go = Prop("BrainCoral", mBrain, reef, p, Rand(rnd, 0.4f, 1.3f), yaw, true, 0.12f); PropCamo(go, mBrain, 0.9f); }
+                else if (kind < 5) { go = Prop("BranchCoral", mBranch, reef, p, Rand(rnd, 0.5f, 1.4f), yaw, true); PropCamo(go, mBranch, 1f); }
+                else if (kind < 7) { go = Prop("StaghornCoral", mStag, reef, p, Rand(rnd, 0.6f, 1.6f), yaw, true); PropCamo(go, mStag, 1f); }
+                else if (kind < 8) { Prop("SeaFan", mFan, reef, p, Rand(rnd, 0.6f, 1.5f), yaw, false); }
+                else if (kind < 9) { go = Prop("Sponge", mSponge, reef, p, Rand(rnd, 0.3f, 0.9f), yaw, true); PropCamo(go, mSponge, 0.8f); }
+                else { Prop("Anemone", mAnemone, reef, p, Rand(rnd, 0.25f, 0.6f), yaw, false); }
+            }
+
+            // Водоросли: рощи и луга морской травы
+            var weeds = new GameObject("Seaweed").transform;
+            weeds.SetParent(world);
+            Vector3[] groves = { new Vector3(-10f, 0f, 3f), new Vector3(3f, 0f, 14f), new Vector3(-20f, 0f, -20f), new Vector3(20f, 0f, 18f) };
+            foreach (var g in groves)
+            {
+                for (int i = 0; i < 18; i++)
+                {
+                    var p = g + new Vector3(Rand(rnd, -3.5f, 3.5f), 0f, Rand(rnd, -3.5f, 3.5f));
+                    p.y = GroundY(p);
+                    Prop("Seaweed", mWeed, weeds, p, Rand(rnd, 1.2f, 3.2f), Rand(rnd, 0, 360), false);
+                }
+                for (int i = 0; i < 30; i++)
+                {
+                    var p = g + new Vector3(Rand(rnd, -7f, 7f), 0f, Rand(rnd, -7f, 7f));
+                    p.y = GroundY(p);
+                    Prop("SeaGrass", mGrass, weeds, p, Rand(rnd, 0.3f, 0.7f), Rand(rnd, 0, 360), false);
+                }
+            }
+
+            // Мелочь на дне
+            var litter = new GameObject("SeabedLife").transform;
+            litter.SetParent(world);
+            for (int i = 0; i < 90; i++)
+            {
+                var p = new Vector3(Rand(rnd, -30f, 30f), 0f, Rand(rnd, -30f, 30f));
+                if (p.magnitude < 2f) continue;
+                p.y = GroundY(p);
+                int k = rnd.Next(4);
+                float yaw = Rand(rnd, 0, 360);
+                if (k == 0) Prop("Starfish", mStar, litter, p, Rand(rnd, 0.12f, 0.3f), yaw, false, 0.1f);
+                else if (k == 1) Prop("Seashell", mShell, litter, p, Rand(rnd, 0.06f, 0.18f), yaw, false, 0.15f);
+                else if (k == 2) Prop("Urchin", mUrchin, litter, p, Rand(rnd, 0.08f, 0.2f), yaw, false, 0.2f);
+                else Prop("SeaGrass", mGrass, litter, p, Rand(rnd, 0.2f, 0.45f), yaw, false);
+            }
+
+            // Мурена в пещере: выглядывает из-за камня (охотник для этапа 3, пока декорация)
+            if (ArtLibrary.HasModel("Moray"))
+            {
+                var cave = GameObject.Find("Cave");
+                if (cave != null)
+                {
+                    var p = cave.transform.TransformPoint(new Vector3(-1.3f, 0f, 2.5f));
+                    p.y = GroundY(p);
+                    Prop("Moray", mMoray, cave.transform, p, 1.3f, cave.transform.eulerAngles.y + 120f, false, 0f);
+                }
+            }
         }
 
         // ------------------------------------------------------------------ helpers

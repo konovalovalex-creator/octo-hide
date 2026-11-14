@@ -32,6 +32,13 @@ Shader "OctoEvo/OctopusSkinLit"
         _Smoothness ("Wet Smoothness", Range(0,1)) = 0.55
         _SSSColor ("Subsurface Color", Color) = (0.9,0.35,0.3,1)
         _SSSStrength ("Subsurface Strength", Range(0,1)) = 0.25
+
+        [Header(Natural skin (model texture))]
+        _UseNatural ("Use Natural Skin", Range(0,1)) = 0
+        _NaturalMap ("Natural Albedo", 2D) = "white" {}
+        [Normal] _NaturalNormal ("Natural Normal", 2D) = "bump" {}
+        _NaturalA ("State A is natural", Range(0,1)) = 1
+        _NaturalB ("State B is natural", Range(0,1)) = 1
     }
 
     SubShader
@@ -47,6 +54,8 @@ Shader "OctoEvo/OctopusSkinLit"
 
         TEXTURE2D(_TexA); SAMPLER(sampler_TexA);
         TEXTURE2D(_TexB); SAMPLER(sampler_TexB);
+        TEXTURE2D(_NaturalMap); SAMPLER(sampler_NaturalMap);
+        TEXTURE2D(_NaturalNormal); SAMPLER(sampler_NaturalNormal);
 
         CBUFFER_START(UnityPerMaterial)
             float4x4 _CapA;
@@ -56,6 +65,9 @@ Shader "OctoEvo/OctopusSkinLit"
             half _Blend;
             float _WaveScale;
             half4 _EdgeColor;
+            half _UseNatural;
+            half _NaturalA;
+            half _NaturalB;
             half _Papillae;
             float _PapillaeHeight;
             float _PapillaeFreq;
@@ -94,12 +106,14 @@ Shader "OctoEvo/OctopusSkinLit"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float4 tangentOS : TANGENT; float2 uv : TEXCOORD0; };
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS   : TEXCOORD1;
+                float4 tangentWS  : TEXCOORD2;
+                float2 uv         : TEXCOORD3;
             };
 
             Varyings vert(Attributes v)
@@ -110,6 +124,8 @@ Shader "OctoEvo/OctopusSkinLit"
                 posWS = Displace(posWS, nWS);
                 o.positionWS = posWS;
                 o.normalWS = nWS;
+                o.tangentWS = float4(TransformObjectToWorldDir(v.tangentOS.xyz), v.tangentOS.w * GetOddNegativeScale());
+                o.uv = v.uv;
                 o.positionCS = TransformWorldToHClip(posWS);
                 return o;
             }
@@ -126,9 +142,21 @@ Shader "OctoEvo/OctopusSkinLit"
             half4 frag(Varyings i) : SV_Target
             {
                 float3 n = normalize(i.normalWS);
+                half3 natural = half3(1, 1, 1);
+                if (_UseNatural > 0.001)
+                {
+                    natural = SAMPLE_TEXTURE2D(_NaturalMap, sampler_NaturalMap, i.uv).rgb;
+                    half3 nTS = UnpackNormal(SAMPLE_TEXTURE2D(_NaturalNormal, sampler_NaturalNormal, i.uv));
+                    float3 t = normalize(i.tangentWS.xyz - n * dot(i.tangentWS.xyz, n));
+                    float3 b = cross(n, t) * i.tangentWS.w;
+                    n = normalize(lerp(n, mul(nTS, float3x3(t, b, n)), _UseNatural));
+                }
 
                 half3 colA = SampleState(TEXTURE2D_ARGS(_TexA, sampler_TexA), _CapA, i.positionWS, n, _ScaleA, _TintA, _AvgA);
                 half3 colB = SampleState(TEXTURE2D_ARGS(_TexB, sampler_TexB), _CapB, i.positionWS, n, _ScaleB, _TintB, _AvgB);
+                // Естественный окрас модели (из Tripo) — когда маскировка не включена
+                colA = lerp(colA, natural, _NaturalA * _UseNatural);
+                colB = lerp(colB, natural, _NaturalB * _UseNatural);
 
                 // Волна хроматофоров: пятна переключаются по шуму, с тёмной кромкой фронта
                 float3 bodyPos = BodySpace(i.positionWS);
