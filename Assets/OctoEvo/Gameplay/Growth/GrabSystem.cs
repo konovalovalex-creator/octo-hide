@@ -21,7 +21,7 @@ namespace OctoEvo
         [Tooltip("Дальность автозахвата в долях длины щупальца")]
         public float autoReach = 1.2f;
         [Tooltip("Дальность броска по кнопке, в длинах щупальца: осьминог прыгает к добыче")]
-        public float manualReach = 3.5f;
+        public float manualReach = 6f;
         [Tooltip("Конус автозахвата: косинус угла от «вперёд»")]
         public float autoConeDot = 0.3f;
         public float reachTimeout = 0.9f;
