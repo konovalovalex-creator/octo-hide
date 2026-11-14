@@ -71,6 +71,8 @@ namespace OctoEvo.EditorTools
                     mRock = ArtLibrary.GroundMaterial("Rock", "DarkRock", 0.22f, "MossRock", 0.3f, coverage: 0.45f, preferUp: 0.9f, patchSize: 0.2f, normalStrength: 1.2f, smoothness: 0.25f);
                 if (ArtLibrary.HasGround("ReefRock"))
                     mReefRock = ArtLibrary.GroundMaterial("ReefRock", "ReefRock", 0.5f, "AlgaeGround", 0.4f, coverage: 0.4f, preferUp: 0.7f, patchSize: 0.3f, normalStrength: 1.1f, smoothness: 0.2f);
+                // Светлый песок под солнцем пересвечивается — приглушаем
+                if (ArtLibrary.HasGround("Sand")) { mSand.SetColor("_BaseColor", new Color(0.6f, 0.58f, 0.53f)); EditorUtility.SetDirty(mSand); }
                 Color sandAvg = ArtLibrary.AverageColor(mSand.GetTexture("_BaseMap"));
                 Color rockAvg = ArtLibrary.AverageColor(mRock.GetTexture("_BaseMap"));
                 Color reefAvg = ArtLibrary.AverageColor(mReefRock.GetTexture("_BaseMap"));
