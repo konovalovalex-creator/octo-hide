@@ -62,6 +62,11 @@ namespace OctoEvo.EditorTools
 
         static void Build(BuildTarget target, string path)
         {
+            if (EditorApplication.isPlaying)
+            {
+                EditorUtility.DisplayDialog("OctoEvo", "Сначала остановите Play.", "OK");
+                return;
+            }
             var scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
             if (scenes.Length == 0)
             {

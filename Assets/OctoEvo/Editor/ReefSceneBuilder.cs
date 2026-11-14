@@ -20,6 +20,11 @@ namespace OctoEvo.EditorTools
         [MenuItem("OctoEvo/Build Reef Scene", priority = 0)]
         public static void Build()
         {
+            if (EditorApplication.isPlaying)
+            {
+                EditorUtility.DisplayDialog("OctoEvo", "Сначала остановите Play — сцену нельзя пересобрать во время игры.", "OK");
+                return;
+            }
             Shader env = Shader.Find("OctoEvo/EnvironmentLit");
             Shader skin = Shader.Find("OctoEvo/OctopusSkinLit");
             Shader ray = Shader.Find("OctoEvo/GodRay");
