@@ -385,6 +385,9 @@ namespace OctoEvo
             // В плавании мантия вытягивается назад — «реактивная» поза
             if (IsSwimming && Speed > 0.5f * SpeedScale) targetScale = Vector3.Scale(targetScale, new Vector3(0.85f, 0.9f, 1.25f));
             Vector3 targetPos = bodyBasePos + Vector3.up * PoseDrop[p];
+            // На дне осьминог сидит на основаниях рук, а на ходу поднимается «на ходули»
+            if (IsGrounded && Pose == OctopusPose.Normal)
+                targetPos += Vector3.up * Mathf.Lerp(0.1f, 0.34f, Mathf.Clamp01(NormalizedSpeed * 1.5f));
             float k = 1f - Mathf.Exp(-6f * Time.deltaTime);
             body.localScale = Vector3.Lerp(body.localScale, targetScale, k);
             body.localPosition = Vector3.Lerp(body.localPosition, targetPos, k);

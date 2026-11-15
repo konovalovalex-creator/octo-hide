@@ -75,7 +75,8 @@ namespace OctoEvo
             float along = Mathf.Clamp(Vector3.Dot(outDir, velDir) * 2f, -1f, 1f);
             float lively = Mathf.Clamp(cfg.wiggle / (0.03f * S), 0.15f, 1.5f);
 
-            float nominal = Mathf.Clamp(cfg.reach / L, 0.2f, 1f);
+            // стоя на месте руки подобраны под «юбку», на ходу — длинные «ходули»
+            float nominal = Mathf.Clamp(cfg.reach / L, 0.2f, 1f) * Mathf.Lerp(0.62f, 1.1f, Mathf.Clamp01(move * 1.5f));
             float ext = Mathf.Clamp(nominal * (1f + 0.24f * move * c * along + 0.04f * sn * lively), 0.2f, 1.05f);
 
             // мах: вперёд по ходу → назад; на возврате рука чуть приподнята
@@ -85,8 +86,8 @@ namespace OctoEvo
 
             float step = L * ext / (n - 1);
             float curlSign = (t % 2 == 0) ? 1f : -1f;
-            float curl = (1.2f + 2.4f * (1f - ext / 1.05f)) * Mathf.Lerp(0.2f, 1f, Mathf.Clamp01(lively));
-            float wave = 0.32f * lively;
+            float curl = (0.9f + 2.6f * (1f - ext / 1.05f)) * Mathf.Lerp(0.2f, 1f, Mathf.Clamp01(lively));
+            float wave = 0.32f * lively * Mathf.Lerp(1f, 0.45f, move); // «ходули» прямее
 
             tc.crawlBlend = Mathf.MoveTowards(tc.crawlBlend, 1f, dt / 0.3f);
             float k = Mathf.Max(tc.crawlBlend * tc.crawlBlend, 1f - Mathf.Exp(-10f * dt));
@@ -108,7 +109,8 @@ namespace OctoEvo
                         g = Vector3.Dot(hit.point - p, up);
                 }
                 float rad = Mathf.Lerp(rootRadius, tipRadius, Mathf.Pow(u, 0.8f)) * S * 0.5f;
-                float blend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(u / 0.3f));
+                // рука спускается от поднятого тела к песку: на ходу — почти до середины длины
+                float blend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(u / Mathf.Lerp(0.3f, 0.6f, move)));
                 Vector3 target = p + up * Mathf.Lerp(0f, g + rad + lift * u, blend);
                 tc.pos[i] = Vector3.LerpUnclamped(tc.pos[i], target, k);
                 tc.prev[i] = tc.pos[i];

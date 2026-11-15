@@ -53,6 +53,12 @@ namespace OctoEvo
         Vector3[][] frT, frN, frB;
         float[] thick;     // утолщение руки: сократилась — стала толще (объём сохраняется)
         float flat;        // на дне руки распластываются вширь
+        float skirt;       // сидя на месте, основания рук с перепонкой раздуваются «юбкой»
+        float[] mantleW;   // насколько вершина принадлежит мантии (она поднимается торчком)
+        Vector3 mantlePivot;
+        float mantleAngle;
+        [Tooltip("Наклон мантии вверх, градусы: сидя / на ходу")]
+        public Vector2 mantleTilt = new Vector2(55f, 35f);
 
         void Awake()
         {
@@ -189,6 +195,8 @@ namespace OctoEvo
             bool hasT = t != null && t.Length == nV;
             bindQ = new Vector3[nV]; bindNQ = new Vector3[nV]; bindTQ = new Vector4[nV];
             armOf = new int[nV]; tParam = new float[nV]; weight = new float[nV];
+            mantleW = new float[nV];
+            mantlePivot = new Vector3(0f, groundOffset + maxY * scale * 0.35f, -0.12f * armLength);
             offP = new Vector3[nV]; offN = new Vector3[nV]; offT = new Vector3[nV];
 
             var bT = new Vector3[Arms][]; var bN = new Vector3[Arms][]; var bB = new Vector3[Arms][];
@@ -211,6 +219,8 @@ namespace OctoEvo
                 float sd = distOut[gx[i], gz[i]];
                 float w = Mathf.Clamp01(sd / blend);
                 w = w * w * (3f - 2f * w);
+                float mw = Mathf.Clamp01((-q.z - 0.12f * armLength) / (0.3f * armLength));
+                mantleW[i] = mw * mw * (3f - 2f * mw) * (1f - w);
                 if (w <= 0f) { armOf[i] = -1; continue; }
 
                 int best = -1; float bestD = float.MaxValue, bestT = 0f;
@@ -287,6 +297,10 @@ namespace OctoEvo
                 thick[k] = Mathf.Lerp(thick[k], want, 1f - Mathf.Exp(-8f * Time.deltaTime));
             }
             flat = Mathf.MoveTowards(flat, motor.IsGrounded ? 1f : 0f, Time.deltaTime * 3f);
+            float moving = Mathf.Clamp01(motor.NormalizedSpeed * 1.5f);
+            skirt = Mathf.MoveTowards(skirt, motor.IsGrounded ? 1f - moving : 0f, Time.deltaTime * 2f);
+            float wantTilt = motor.IsGrounded && motor.Pose == OctopusPose.Normal ? Mathf.Lerp(mantleTilt.x, mantleTilt.y, moving) : 0f;
+            mantleAngle = Mathf.Lerp(mantleAngle, wantTilt, 1f - Mathf.Exp(-4f * Time.deltaTime));
 
             // Жёсткая часть повторяет тело: поза покоя → текущая поза тела (сдвиг, поворот, «дыхание»)
             Matrix4x4 bodyM = body.parent.localToWorldMatrix
@@ -296,10 +310,21 @@ namespace OctoEvo
 
             for (int i = 0; i < nV; i++)
             {
-                Vector3 rp = bodyM.MultiplyPoint3x4(bindQ[i]);
-                Vector3 rn = bodyM.MultiplyVector(bindNQ[i]);
+                Vector3 bq = bindQ[i], bn = bindNQ[i];
                 Vector4 bt = bindTQ[i];
-                Vector3 rt = bodyM.MultiplyVector(new Vector3(bt.x, bt.y, bt.z));
+                Vector3 btv = new Vector3(bt.x, bt.y, bt.z);
+                float mwt = mantleW[i];
+                if (mwt > 0.001f && mantleAngle > 0.1f)
+                {
+                    // мантия поднимается торчком: поворот вокруг поперечной оси у «шеи»
+                    Quaternion mr = Quaternion.AngleAxis(mantleAngle * mwt, Vector3.right);
+                    bq = mantlePivot + mr * (bq - mantlePivot);
+                    bn = mr * bn;
+                    btv = mr * btv;
+                }
+                Vector3 rp = bodyM.MultiplyPoint3x4(bq);
+                Vector3 rn = bodyM.MultiplyVector(bn);
+                Vector3 rt = bodyM.MultiplyVector(btv);
                 int k = armOf[i];
                 if (k >= 0)
                 {
@@ -307,8 +332,8 @@ namespace OctoEvo
                     Vector3 o = offP[i];
                     // толщина по состоянию руки + распластывание у основания, когда лежит на дне
                     float baseU = 1f - Mathf.Clamp01(tParam[i] / (segs - 1));
-                    float wide = thick[k] * (1f + 0.3f * flat * baseU * baseU);
-                    float tall = thick[k] * (1f - 0.12f * flat * baseU);
+                    float wide = thick[k] * (1f + (0.3f * flat + 0.7f * skirt) * baseU * baseU);
+                    float tall = thick[k] * (1f - 0.12f * flat * baseU + 0.25f * skirt * baseU * baseU);
                     Vector3 ap = P + (T * o.x + N * (o.y * tall) + B * (o.z * wide)) * S;
                     Vector3 on = offN[i]; Vector3 an = T * on.x + N * on.y + B * on.z;
                     Vector3 ot = offT[i]; Vector3 at = T * ot.x + N * ot.y + B * ot.z;
